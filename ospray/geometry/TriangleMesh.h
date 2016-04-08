@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,8 +27,8 @@ namespace ospray {
 
     \ingroup ospray_supported_geometries
 
-    A triangle mesh is created via \ref ospNewTriangleMesh, or via
-    calling \ref ospNewGeometry with type string \"trianglemesh\".
+    A triangle mesh is created via calling \ref ospNewGeometry with type
+    string "triangles".
 
     Once created, a trianglemesh recognizes the following parameters
     <pre>

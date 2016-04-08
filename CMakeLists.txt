@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2016 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -17,112 +17,156 @@
 PROJECT(OSPRay)
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-IF(COMMAND cmake_policy)
-  CMAKE_POLICY(SET CMP0003 NEW)
-
-  IF(${CMAKE_MAJOR_VERSION} EQUAL 3)
-    CMAKE_POLICY(SET CMP0042 NEW)
-  ENDIF(${CMAKE_MAJOR_VERSION} EQUAL 3)
-ENDIF(COMMAND cmake_policy)
+CMAKE_POLICY(SET CMP0003 NEW) # since 2.6
+IF(POLICY CMP0015)
+  CMAKE_POLICY(SET CMP0015 NEW) # since 2.8.1
+ENDIF()
+IF(POLICY CMP0042)
+  CMAKE_POLICY(SET CMP0042 NEW) # since 3.0
+ENDIF()
+IF(POLICY CMP0054)
+  CMAKE_POLICY(SET CMP0054 OLD) # since 3.1
+ENDIF()
 
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
-SET(OSPRAY_VERSION 0.8.2)
+SET(OSPRAY_VERSION_MAJOR 0)
+SET(OSPRAY_VERSION_MINOR 9)
+SET(OSPRAY_VERSION_PATCH 1)
+SET(OSPRAY_VERSION
+  ${OSPRAY_VERSION_MAJOR}.${OSPRAY_VERSION_MINOR}.${OSPRAY_VERSION_PATCH}
+)
 SET(OSPRAY_SOVERSION 0)
 
-IF(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type." FORCE)
-  SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
-ENDIF(NOT CMAKE_BUILD_TYPE)
+MACRO(PRINT var)
+  MESSAGE("${var} = ${${var}}")
+ENDMACRO()
 
-MARK_AS_ADVANCED(CMAKE_INSTALL_PREFIX)
+SET(CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo")
+IF (WIN32)
+  IF (NOT OSPRAY_DEFAULT_CMAKE_CONFIGURATION_TYPES_SET)
+    SET(CMAKE_CONFIGURATION_TYPES "${CONFIGURATION_TYPES}" CACHE STRING "List of generated configurations." FORCE)
+    SET(OSPRAY_DEFAULT_CMAKE_CONFIGURATION_TYPES_SET ON CACHE INTERNAL "Default CMake configuration types set.")
+  ENDIF()
+ELSE()
+  IF(NOT CMAKE_BUILD_TYPE)
+    SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type." FORCE)
+    SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CONFIGURATION_TYPES})
+  ENDIF()
+ENDIF()
 
 SET(OSPRAY_BINARY_DIR ${PROJECT_BINARY_DIR})
 SET(LIBRARY_OUTPUT_PATH ${OSPRAY_BINARY_DIR})
 SET(EXECUTABLE_OUTPUT_PATH ${OSPRAY_BINARY_DIR})
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_PATH})
-
-MARK_AS_ADVANCED(LIBRARY_OUTPUT_PATH)
-MARK_AS_ADVANCED(EXECUTABLE_OUTPUT_PATH)
-MARK_AS_ADVANCED(CMAKE_INSTALL_PREFIX)
-MARK_AS_ADVANCED(CMAKE_BACKWARDS_COMPATIBILITY)
 
 # add experimental KNL/AVX512 build option - not fully supported, yet, so keep it hidden
 OPTION(OSPRAY_BUILD_ENABLE_KNL "Enable experimental 'Knights Landing' build?")
 MARK_AS_ADVANCED(OSPRAY_BUILD_ENABLE_KNL)
 
-# compiler selection for the non-MIC part
-IF (APPLE)
-  SET(OSPRAY_COMPILER "CLANG" CACHE STRING "compiler to use (ICC,GCC, or CLANG)")
-  SET_PROPERTY(CACHE OSPRAY_COMPILER PROPERTY STRINGS ICC GCC CLANG)
-ELSE(APPLE)
-  SET(OSPRAY_COMPILER "GCC" CACHE STRING "compiler to use (ICC or GCC)")
-  SET_PROPERTY(CACHE OSPRAY_COMPILER PROPERTY STRINGS ICC GCC)
-ENDIF(APPLE)
+OPTION(OSPRAY_VOLUME_VOXELRANGE_IN_APP "Move 'voxelrange' computations to app?" OFF)
+MARK_AS_ADVANCED(OSPRAY_VOLUME_VOXELRANGE_IN_APP)
 
-# whether to build in MIC/xeon phi support
-OPTION(OSPRAY_BUILD_MIC_SUPPORT "Build OSPRay with KNC/MIC Support?")
-# whether to build in MPI support
+IF (WIN32)
+  SET(OSPRAY_BUILD_MIC_SUPPORT OFF CACHE INTERNAL "OSPRay with KNC not supported on Windows.")
+ELSE()
+  OPTION(OSPRAY_BUILD_MIC_SUPPORT "Build OSPRay with KNC Support?")
+ENDIF()
+
 OPTION(OSPRAY_BUILD_MPI_DEVICE "Add MPI Remote/Distributed rendering support?")
 
 # the arch we're targeting for the non-MIC/non-xeon phi part of ospray
-SET(OSPRAY_BUILD_ISA "ALL" CACHE STRING "Target ISA (SSE,AVX,AVX2,or ALL)")
+SET(OSPRAY_BUILD_ISA "ALL" CACHE STRING "Target ISA (SSE, AVX, AVX2, or ALL)")
 IF (OSPRAY_BUILD_ENABLE_KNL)
   SET_PROPERTY(CACHE OSPRAY_BUILD_ISA PROPERTY STRINGS ALL SSE AVX AVX2 AVX512)
-	OPTION(OSPRAY_ISPC_KNL_NATIVE "Enable ISPC's native KNL build")
 ELSE()
   SET_PROPERTY(CACHE OSPRAY_BUILD_ISA PROPERTY STRINGS ALL SSE AVX AVX2)
 ENDIF()
 
 # make ospray target and compiler uppercase - we need this in some other parts of the build system
-STRING(TOUPPER ${OSPRAY_COMPILER} OSPRAY_COMPILER)
 STRING(TOUPPER ${OSPRAY_BUILD_ISA} OSPRAY_BUILD_ISA)
 
 SET(OSPRAY_MIC ${OSPRAY_BUILD_MIC_SUPPORT})
 SET(OSPRAY_MPI ${OSPRAY_BUILD_MPI_DEVICE})
 
+# Make OpenMP available to all apps/libraries/modules
+FIND_PACKAGE(OpenMP QUIET)
+IF (OPENMP_FOUND)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  SET(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+ENDIF()
 
 ##############################################################
-# cmake modules
+# create binary packages; before any INSTALL() invocation/definition
 ##############################################################
+
+INCLUDE(package)
+
+##############################################################
+# CMake modules
+##############################################################
+
 INCLUDE(cmake/ospray.cmake)
 INCLUDE(cmake/ispc.cmake)
-INCLUDE(cmake/configure_embree.cmake)
-INCLUDE(cmake/mpi.cmake)
-INCLUDE(cmake/doxygen.cmake)
 
-SET(OSPRAY_INSTALL_TARGET ospray-${OSPRAY_VERSION}-${CMAKE_SYSTEM_NAME})
-STRING(TOLOWER "${OSPRAY_INSTALL_TARGET}" OSPRAY_INSTALL_TARGET_LC)
-SET(CMAKE_INSTALL_PREFIX 
-  /tmp/$ENV{USER}/OSPRAY-RELEASES/${OSPRAY_INSTALL_TARGET_LC})
+SET(OSPRAY_EMBREE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/ospray/embree-v2.7.1)
+
+
+INCLUDE(cmake/mpi.cmake)
+
+IF(NOT WIN32)
+  INCLUDE(cmake/doxygen.cmake)
+ENDIF()
 
 ##############################################################
-# the ospray library
+# the OSPRay library
 ##############################################################
 
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
-SET (OSPRAY_TARGET "intel64")
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ospray/include)
+SET(OSPRAY_TARGET "intel64")
 ADD_SUBDIRECTORY(ospray builddir/ospray/intel64)
 IF (OSPRAY_MIC)
-  SET (OSPRAY_TARGET "mic")
+  SET(OSPRAY_TARGET "mic")
   ADD_SUBDIRECTORY(ospray builddir/ospray/mic)
 ENDIF()
 
 ##############################################################
-# ospray modules
+# OSPRay modules
 ##############################################################
-SET (OSPRAY_TARGET "intel64")
+
+SET(OSPRAY_TARGET "intel64")
 ADD_SUBDIRECTORY(modules builddir/modules/intel64)
 IF (OSPRAY_MIC)
-  SET (OSPRAY_TARGET "mic")
+  SET(OSPRAY_TARGET "mic")
   ADD_SUBDIRECTORY(modules builddir/modules/mic)
 ENDIF()
 
 ##############################################################
-# ospray sample apps at the end, they may need modules
+# OSPRay sample apps; at the end: they may need modules
 ##############################################################
-SET (OSPRAY_TARGET "intel64")
+
+SET(OSPRAY_TARGET "intel64")
 ADD_SUBDIRECTORY(apps builddir/apps/intel64)
 IF (OSPRAY_MIC)
-  SET (OSPRAY_TARGET "mic")
+  SET(OSPRAY_TARGET "mic")
   ADD_SUBDIRECTORY(apps builddir/apps/mic)
 ENDIF()
+
+# create a configure file that both ospray and ispc can read the cmake config from
+# needs to be at the end, after all cache variables have been set
+CONFIGURE_FILE(ospray/common/OSPConfig.h.in OSPConfig.h)
+INSTALL(FILES ${CMAKE_BINARY_DIR}/OSPConfig.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ospray
+  COMPONENT devel
+)
+INSTALL(
+    DIRECTORY ./ospray DESTINATION include FILES_MATCHING
+    PATTERN "embree-v2.7.1" EXCLUDE
+    PATTERN "*.h" PATTERN "*.ih" PATTERN "*.isph")
+INSTALL(
+    DIRECTORY ./ospray/embree-v2.7.1/ DESTINATION include/ospray/embree
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.ih" PATTERN "*.isph")
+
+# has to be last
+INCLUDE(CPack)

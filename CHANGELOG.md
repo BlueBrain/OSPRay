@@ -1,6 +1,86 @@
 Version History
 ---------------
 
+### Changes in v0.9.1:
+
+-   Volume rendering now integrated into the "scivis" renderer
+    -   Volumes are rendered in the same way the "dvr" volume renderer
+        renders them
+    -   Ambient occlusion works with implicit isosurfaces, with a known
+        visual quality/performance trade-off
+-   Intel® Xeon Phi™ (codename Knights Corner) COI device and build
+    infrastructure restored (volume rendering is known to still be
+    broken)
+-   New support for CPack built OSPRay binary redistributable packages
+-   Add support for HDRI lighting in path tracer
+-   Add `ospRemoveVolume()` API call
+-   Add ability to render a subsection of the full view into the entire
+    framebuffer in the perspective camera
+-   Many miscellaneous cleanups, bugfixes, and improvements:
+    -   The depthbuffer is now correctly populated by in the "scivis"
+        renderer
+    -   Updated default renderer to be "ao1" in ospModelViewer
+    -   Trianglemesh postIntersect shading is now 64-bit safe
+    -   Texture2D has been reworked, with many improvements and bug fixes
+    -   Fixed bug where MPI device would freeze while rendering frames
+        with TBB
+    -   Updates to CMake with better error messages when TBB is missing
+
+### Changes in v0.9.0:
+
+The OSPRay v0.9.0 release adds significant new features as well as API
+changes.
+
+-   Experimental support for data-distributed MPI-parallel volume
+    rendering
+-   New SciVis-focused renderer ("raytracer" or "scivis") combining
+    functionality of "obj" and "ao" renderers
+    -   Ambient occlusion is quite flexible: dynamic number of samples,
+        maximum ray distance, and weight
+-   Updated Embree version to v2.7.1 with native support for AVX512 for
+    triangle mesh surface rendering on the Intel Xeon Phi processor
+    (codename Knights Landing)
+-   OSPRay now uses C++11 features, requiring up to date compiler and
+    standard library versions (GCC v4.8.0)
+-   Optimization of volume sampling resulting in volume rendering
+    speedups of up to 1.5x
+-   Updates to pathtracer
+    -   Reworked material system
+    -   Added texture transformations and colored transparency in OBJ
+        material
+    -   Support for alpha and depth components of framebuffer 
+-   Added thinlens camera, i.e. support for depth of field
+-   Tasking system has been updated to use Intel® Threading Building
+    Blocks (TBB)
+-   The `ospGet*()` API calls have been deprecated and will be removed
+    in a subsequent release
+
+### Changes in v0.8.3:
+
+-   Enhancements and optimizations to path tracer
+    -   Soft shadows (light sources: sphere, cone, extended spot, quad)
+    -   Transparent shadows
+    -   Normal mapping (OBJ material)
+-   Volume rendering enhancements:
+    -   Expanded material support
+    -   Support for multiple lights
+    -   Support for double precision volumes
+    -   Added `ospSampleVolume()` API call to support limited probing of
+        volume values
+-   New features to support compositing externally rendered content with
+    OSPRay-rendered content
+    -   Renderers support early ray termination through a maximum depth
+        parameter
+    -   New OpenGL utility module to convert between OSPRay and OpenGL
+        depth values
+-   Added panoramic and orthographic camera types
+-   Proper CMake-based installation of OSPRay and CMake `find_package()`
+    support for use in external projects
+-   Experimental Windows support
+-   Deprecated `ospNewTriangleMesh()`; use `ospNewGeometry("triangles")`
+    instead
+-   Bug fixes and cleanups throughout the codebase
+
 ### Changes in v0.8.2:
 
 -   Initial support for AVX512 and the Intel® Xeon Phi™ processor

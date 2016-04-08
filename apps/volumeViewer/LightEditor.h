@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <QtGui>
 #include <ospray/ospray.h>
+#include <QtGui>
+#include <stdexcept>
 
 class LightEditor : public QWidget {
 
@@ -25,22 +26,31 @@ Q_OBJECT
 
 public:
 
-  LightEditor(OSPLight light);
+  LightEditor(OSPLight ambientLight, OSPLight directionalLight);
 
 signals:
 
-  void lightChanged();
+  void lightsChanged();
 
 protected slots:
 
-  void alphaBetaSliderValueChanged();
+  void ambientLightChanged();
+  void directionalLightChanged();
 
 protected:
 
-  //! OSPRay light.
-  OSPLight light;
+  //! OSPRay ambient light.
+  OSPLight ambientLight;
 
-  //! UI elements.
-  QSlider alphaSlider;
-  QSlider betaSlider;
+  //! OSPRay directional light.
+  OSPLight directionalLight;
+
+  // Ambient light UI elements.
+  QDoubleSpinBox ambientLightIntensitySpinBox;
+
+  // Directional light UI elements.
+  QDoubleSpinBox directionalLightIntensitySpinBox;
+  QSlider directionalLightAzimuthSlider;
+  QSlider directionalLightElevationSlider;
+
 };

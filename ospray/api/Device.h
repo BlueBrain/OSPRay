@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -67,6 +67,9 @@ namespace ospray {
       /*! add a new volume to a model */
       virtual void addVolume(OSPModel _model, OSPVolume _volume) = 0;
 
+      /*! remove an existing volume from a model */
+      virtual void removeVolume(OSPModel _model, OSPVolume _volume) = 0;
+
       /*! create a new data buffer */
       virtual OSPData newData(size_t nitems, OSPDataType format, void *init, int flags) = 0;
 
@@ -89,8 +92,14 @@ namespace ospray {
       /*! assign (named) vec3f parameter to an object */
       virtual void setVec3f(OSPObject object, const char *bufName, const vec3f &v) = 0;
 
+      /*! assign (named) vec4f parameter to an object */
+      virtual void setVec4f(OSPObject object, const char *bufName, const vec4f &v) = 0;
+
       /*! assign (named) int parameter to an object */
       virtual void setInt(OSPObject object, const char *bufName, const int f) = 0;
+
+      /*! assign (named) vec2i parameter to an object */
+      virtual void setVec2i(OSPObject object, const char *bufName, const vec2i &v) = 0;
 
       /*! assign (named) vec3i parameter to an object */
       virtual void setVec3i(OSPObject object, const char *bufName, const vec3i &v) = 0;
@@ -131,14 +140,20 @@ namespace ospray {
       /*! Get the named 3-vector floating point value associated with an object. */
       virtual int getVec3f(OSPObject object, const char *name, vec3f *value) = 0;
 
+      /*! Get the named 4-vector floating point value associated with an object. */
+      virtual int getVec4f(OSPObject object, const char *name, vec4f *value) = 0;
+
       /*! Get the named 3-vector integer value associated with an object. */
       virtual int getVec3i(OSPObject object, const char *name, vec3i *value) = 0;
 
-      /*! create a new triangle mesh geometry */
-      virtual OSPTriangleMesh newTriangleMesh() = 0;
-
       /*! create a new renderer object (out of list of registered renderers) */
       virtual OSPRenderer newRenderer(const char *type) = 0;
+
+      /*! create a new pixelOp object (out of list of registered pixelOps) */
+      virtual OSPPixelOp newPixelOp(const char *type) = 0;
+
+      /*! set a frame buffer's pixel op object */
+      virtual void setPixelOp(OSPFrameBuffer _fb, OSPPixelOp _op) = 0;
       
       /*! create a new geometry object (out of list of registered geometries) */
       virtual OSPGeometry newGeometry(const char *type) = 0;
@@ -206,8 +221,24 @@ namespace ospray {
         throw "instances not implemented";
       }
 
+      /*! perform a pick operation */
       virtual OSPPickResult pick(OSPRenderer renderer, const vec2f &screenPos) 
-      { throw std::runtime_error("pick() not impelemnted for this device"); };
+      { 
+        throw std::runtime_error("pick() not impelemnted for this device"); 
+      };
+
+      /*! switch API mode for distriubted API extensions */
+      virtual void apiMode(OSPDApiMode mode)
+      { 
+        throw std::runtime_error("Distributed API not available on this device (when calling ospApiMode())"); 
+      }
+
+      virtual void sampleVolume(float **results, OSPVolume volume, 
+                                const vec3f *worldCoordinates, const size_t &count)
+      {
+        throw std::runtime_error("sampleVolume() not implemented for this device");
+      }
+
     };
   } // ::ospray::api
 } // ::ospray

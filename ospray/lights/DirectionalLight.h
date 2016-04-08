@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -36,6 +36,7 @@ namespace ospray {
       vec3f direction;      //!< Direction of the emitted rays
       vec3f color;          //!< RGB color of the emitted light
       float intensity;      //!< Amount of light emitted
+      float angularDiameter;//!< Apparent size of the distant light, in degree (e.g. 0.53 for the sun)
   };
 
 }

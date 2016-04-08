@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -33,7 +33,8 @@ OSPVolume VolumeFile::importVolume(const std::string &filename, OSPVolume volume
   std::string type = filename.substr(filename.find_last_of(".") + 1);
 
   // Return a concrete instance of the requested subtype if the creation function is already known.
-  if (symbolRegistry.count(type) > 0 && symbolRegistry[type] != NULL) return((*symbolRegistry[type])(fullfilename, volume));
+  if (symbolRegistry.count(type) > 0 && symbolRegistry[type] != NULL) 
+    return((*symbolRegistry[type])(fullfilename, volume));
 
   // Otherwise construct the name of the creation function to look for.
   std::string creationFunctionName = "ospray_import_volume_file_" + std::string(type);
@@ -41,9 +42,14 @@ OSPVolume VolumeFile::importVolume(const std::string &filename, OSPVolume volume
   // Look for the named function.
   symbolRegistry[type] = (creationFunctionPointer) ospray::getSymbol(creationFunctionName);
 
-  // The named function may not be found if the requested subtype is not known.
+  // The named function may not be found of the requested subtype is not known.
   if (!symbolRegistry[type]) std::cerr << "  ospray_module_loaders::VolumeFile  WARNING: unrecognized file type '" + type + "'." << std::endl;
 
   // Return a handle for the loaded volume object.
   return(symbolRegistry[type] ? (*symbolRegistry[type])(fullfilename, volume) : NULL);
 }
+
+#ifdef OSPRAY_VOLUME_VOXELRANGE_IN_APP
+std::map<OSPVolume, ospray::vec2f> VolumeFile::voxelRangeOf;
+#endif
+

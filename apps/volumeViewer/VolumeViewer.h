@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "ospray/common/OSPCommon.h"
 #include "QOSPRayWindow.h"
 #include "SliceWidget.h"
 #include <QtGui>
@@ -24,6 +25,8 @@
 
 class TransferFunctionEditor;
 class IsosurfaceEditor;
+class ProbeWidget;
+class OpenGLAnnotationRenderer;
 
 //! OSPRay model and its volumes / geometries
 struct ModelState {
@@ -44,22 +47,27 @@ Q_OBJECT
 public:
 
   //! Constructor.
-  VolumeViewer(const std::vector<std::string> &objectFileFilenames, bool showFrameRate, bool fullScreen, std::string writeFramesFilename);
+  VolumeViewer(const std::vector<std::string> &objectFileFilenames,
+               std::string renderer_type,
+               bool ownModelPerObject,
+               bool showFrameRate,
+               bool fullScreen,
+               std::string writeFramesFilename);
 
-  //! Destructor.
-  ~VolumeViewer() {};
+  //! Get the volume bounding box.
+  ospray::box3f getBoundingBox();
 
   //! Get the OSPRay output window.
-  QOSPRayWindow *getWindow() { return osprayWindow; }
+  QOSPRayWindow *getWindow();
 
   //! Get the transfer function editor.
-  TransferFunctionEditor *getTransferFunctionEditor() { return transferFunctionEditor; }
+  TransferFunctionEditor *getTransferFunctionEditor();
 
   //! Select the model (time step) to be displayed.
   void setModel(size_t index);
 
   //! A string description of this class.
-  std::string toString() const { return("VolumeViewer"); }
+  std::string toString() const;
 
 public slots:
 
@@ -67,13 +75,13 @@ public slots:
   void autoRotate(bool set);
 
   //! Set auto-rotation rate
-  void setAutoRotationRate(float rate) { autoRotationRate = rate; }
+  void setAutoRotationRate(float rate);
 
   //! Draw the model associated with the next time step.
-  void nextTimeStep() { modelIndex = (modelIndex + 1) % modelStates.size();  setModel(modelIndex);  render(); }
+  void nextTimeStep();
 
   //! Toggle animation over the time steps.
-  void playTimeSteps(bool animate) { if (animate == true) playTimeStepsTimer.start(500);  else playTimeStepsTimer.stop(); }
+  void playTimeSteps(bool animate);
 
   //! Add a slice to the volume from file.
   void addSlice(std::string filename);
@@ -85,16 +93,16 @@ public slots:
   void screenshot(std::string filename = std::string());
 
   //! Re-commit all OSPRay volumes.
-  void commitVolumes() { for(size_t i=0; i<modelStates.size(); i++) for(size_t j=0; j<modelStates[i].volumes.size(); j++) ospCommit(modelStates[i].volumes[j]); }
+  void commitVolumes();
 
   //! Force the OSPRay window to be redrawn.
-  void render() { if (osprayWindow != NULL) { osprayWindow->resetAccumulationBuffer(); osprayWindow->updateGL(); } }
+  void render();
+
+  //! Enable / disable rendering of annotations.
+  void setRenderAnnotationsEnabled(bool value);
 
   //! Set subsampling during interaction mode on renderer.
-  void setSubsamplingInteractionEnabled(bool value) {
-    ospSet1i(renderer, "spp", value ? -1 : 1);
-    if(rendererInitialized) ospCommit(renderer);
-  }
+  void setSubsamplingInteractionEnabled(bool value);
 
   //! Set gradient shading flag on all volumes.
   void setGradientShadingEnabled(bool value);
@@ -103,7 +111,7 @@ public slots:
   void setSamplingRate(double value);
 
   //! Set volume clipping box on all volumes.
-  void setVolumeClippingBox(osp::box3f value);
+  void setVolumeClippingBox(ospray::box3f value);
 
   //! Set slices on all volumes.
   void setSlices(std::vector<SliceParameters> sliceParameters);
@@ -115,6 +123,7 @@ protected:
 
   //! OSPRay object file filenames, one for each model / time step.
   std::vector<std::string> objectFileFilenames;
+  bool ownModelPerObject; // create a separate model for each object (not not only for each file)
 
   //! OSPRay models and their volumes / geometries.
   std::vector<ModelState> modelStates;
@@ -123,7 +132,7 @@ protected:
   size_t modelIndex;
 
   //! Bounding box of the (first) volume.
-  osp::box3f boundingBox;
+  ospray::box3f boundingBox;
 
   //! OSPRay renderer.
   OSPRenderer renderer;
@@ -134,11 +143,17 @@ protected:
   //! OSPRay transfer function.
   OSPTransferFunction transferFunction;
 
-  //! OSPRay light.
-  OSPLight light;
+  //! OSPRay ambient light.
+  OSPLight ambientLight;
+
+  //! OSPRay directional light.
+  OSPLight directionalLight;
 
   //! The OSPRay output window.
   QOSPRayWindow *osprayWindow;
+
+  //! The OpenGL annotation renderer.
+  OpenGLAnnotationRenderer *annotationRenderer;
 
   //! The transfer function editor.
   TransferFunctionEditor *transferFunctionEditor;
@@ -148,6 +163,9 @@ protected:
 
   //! The isosurface editor.
   IsosurfaceEditor *isosurfaceEditor;
+
+  //! The probe widget.
+  ProbeWidget *probeWidget;
 
   //! Auto-rotate button.
   QAction *autoRotateAction;
@@ -173,7 +191,7 @@ protected:
   void importObjectsFromFile(const std::string &filename);
 
   //! Create and configure the OSPRay state.
-  void initObjects();
+  void initObjects(const std::string &renderer_type);
 
   //! Create and configure the user interface widgets and callbacks.
   void initUserInterfaceWidgets();

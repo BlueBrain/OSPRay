@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -38,6 +38,24 @@ namespace ospray {
 
       /*! 'render' the nodes */
       virtual void render(RenderContext &ctx);
+
+      //! \brief Initialize this node's value from given XML node 
+      /*!
+        \detailed This allows a plug-and-play concept where a XML
+        file can specify all kind of nodes wihout needing to know
+        their actual types: The XML parser only needs to be able to
+        create a proper C++ instance of the given node type (the
+        OSP_REGISTER_SG_NODE() macro will allow it to do so), and can
+        tell the node to parse itself from the given XML content and
+        XML children 
+        
+        \param node The XML node specifying this node's fields
+
+        \param binBasePtr A pointer to an accompanying binary file (if
+        existant) that contains additional binary data that the xml
+        node fields may point into
+      */
+      virtual void setFromXML(const xml::Node *const node, const unsigned char *binBasePtr);
 
       OSPGeometry         ospGeometry;
       

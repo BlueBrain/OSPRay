@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,6 +15,24 @@
 // ======================================================================== //
 
 #include "QOSPRayWindow.h"
+#include "modules/opengl/util.h"
+
+#ifdef __APPLE__
+  #include <OpenGL/glu.h>
+#else
+  #include <GL/glu.h>
+#endif
+
+std::ostream &operator<<(std::ostream &o, const Viewport &viewport)
+{
+  o <<  "-vp " << viewport.from.x << " " << viewport.from.y << " " << viewport.from.z
+    << " -vi " << viewport.at.x   << " " << viewport.at.y   << " " << viewport.at.z
+    << " -vu " << viewport.up.x   << " " << viewport.up.y   << " " << viewport.up.z
+    << std::endl;
+
+  return o;
+}
+
 
 QOSPRayWindow::QOSPRayWindow(QMainWindow *parent, 
                              OSPRenderer renderer, 
@@ -30,6 +48,7 @@ QOSPRayWindow::QOSPRayWindow(QMainWindow *parent,
     frameBuffer(NULL), 
     renderer(NULL), 
     camera(NULL),
+    maxDepthTexture(NULL),
     writeFramesFilename(writeFramesFilename)
 {
   // assign renderer
@@ -86,7 +105,7 @@ void QOSPRayWindow::setBenchmarkParameters(int benchmarkWarmUpFrames, int benchm
   this->benchmarkFrames = benchmarkFrames;
 }
 
-void QOSPRayWindow::setWorldBounds(const osp::box3f &worldBounds)
+void QOSPRayWindow::setWorldBounds(const ospray::box3f &worldBounds)
 {
   this->worldBounds = worldBounds;
 
@@ -112,9 +131,10 @@ void QOSPRayWindow::paintGL()
 
   // update OSPRay camera if viewport has been modified
   if(viewport.modified) {
-    ospSetVec3f(camera,"pos" ,viewport.from);
-    ospSetVec3f(camera,"dir" ,viewport.at - viewport.from);
-    ospSetVec3f(camera,"up", viewport.up);
+    const ospray::vec3f dir =  viewport.at - viewport.from;
+    ospSetVec3f(camera,"pos" ,(const osp::vec3f&)viewport.from);
+    ospSetVec3f(camera,"dir" ,(const osp::vec3f&)dir);
+    ospSetVec3f(camera,"up", (const osp::vec3f&)viewport.up);
     ospSetf(camera,"aspect", viewport.aspect);
     ospSetf(camera,"fovy", viewport.fovY);
 
@@ -124,12 +144,50 @@ void QOSPRayWindow::paintGL()
   }
 
   renderFrameTimer.start();
+
+  // we have OpenGL components if any slots are connected to the renderGLComponents() signal
+  // if so, render these first and then composite the OSPRay-rendered content on top
+  bool haveOpenGLComponents = receivers(SIGNAL(renderGLComponents())) > 0;
+
+  if (haveOpenGLComponents) {
+
+    // setup OpenGL view to match current view and render all OpenGL components
+    renderGL();
+
+    // generate max depth texture for early ray termination
+    if (maxDepthTexture)
+      ospRelease(maxDepthTexture);
+
+    maxDepthTexture = ospray::opengl::getOSPDepthTextureFromOpenGLPerspective();
+    ospSetObject(renderer, "maxDepthTexture", maxDepthTexture);
+
+    // disable OSPRay background rendering since we're compositing
+    ospSet1i(renderer, "backgroundEnabled", 0);
+
+    ospCommit(renderer);
+
+    // disable OpenGL depth testing and enable blending for compositing
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+  else {
+
+    // unset any maximum depth texture and enable OSPRay background rendering
+    ospSetObject(renderer, "maxDepthTexture", NULL);
+    ospSet1i(renderer, "backgroundEnabled", 1);
+    ospCommit(renderer);
+
+    // disable OpenGL blending
+    glDisable(GL_BLEND);
+  }
+
   ospRenderFrame(frameBuffer, renderer, OSP_FB_COLOR | OSP_FB_ACCUM);
   double framesPerSecond = 1000.0 / renderFrameTimer.elapsed();
   char title[1024];  sprintf(title, "OSPRay Volume Viewer (%.4f fps)", framesPerSecond);
   if (showFrameRate == true) parent->setWindowTitle(title);
 
-  uint32 *mappedFrameBuffer = (unsigned int *) ospMapFrameBuffer(frameBuffer);
+  uint32_t *mappedFrameBuffer = (unsigned int *) ospMapFrameBuffer(frameBuffer);
 
   glDrawPixels(windowSize.x, windowSize.y, GL_RGBA, GL_UNSIGNED_BYTE, mappedFrameBuffer);
   if (writeFramesFilename.length()) writeFrameBufferToFile(mappedFrameBuffer);
@@ -158,16 +216,16 @@ void QOSPRayWindow::paintGL()
 
 void QOSPRayWindow::resizeGL(int width, int height)
 {
-  windowSize = osp::vec2i(width, height);
+  windowSize = ospray::vec2i(width, height);
 
   // reallocate OSPRay framebuffer for new size
   if(frameBuffer)
     ospFreeFrameBuffer(frameBuffer);
 
-  frameBuffer = ospNewFrameBuffer(windowSize, OSP_RGBA_I8, OSP_FB_COLOR | OSP_FB_ACCUM);
+  frameBuffer = ospNewFrameBuffer((const osp::vec2i&)windowSize, OSP_RGBA_I8, OSP_FB_COLOR | OSP_FB_ACCUM);
 
   // set gamma correction
-  ospSet1f(frameBuffer, "gamma", 2.2f);
+  ospSet1f(frameBuffer, "gamma", 1.0f);
   ospCommit(frameBuffer);
 
   resetAccumulationBuffer();
@@ -255,12 +313,12 @@ void QOSPRayWindow::mouseMoveEvent(QMouseEvent * event)
 
 void QOSPRayWindow::rotateCenter(float du, float dv)
 {
-  const osp::vec3f pivot = viewport.at;
+  const ospray::vec3f pivot = viewport.at;
 
-  osp::affine3f xfm = osp::affine3f::translate(pivot)
-    * osp::affine3f::rotate(viewport.frame.l.vx, -dv)
-    * osp::affine3f::rotate(viewport.frame.l.vz, -du)
-    * osp::affine3f::translate(-pivot);
+  ospray::affine3f xfm = ospray::affine3f::translate(pivot)
+    * ospray::affine3f::rotate(viewport.frame.l.vx, -dv)
+    * ospray::affine3f::rotate(viewport.frame.l.vz, -du)
+    * ospray::affine3f::translate(-pivot);
 
   viewport.frame = xfm * viewport.frame;
   viewport.from  = xfmPoint(xfm, viewport.from);
@@ -272,8 +330,8 @@ void QOSPRayWindow::rotateCenter(float du, float dv)
 
 void QOSPRayWindow::strafe(float du, float dv)
 {
-  osp::affine3f xfm = osp::affine3f::translate(dv * viewport.frame.l.vz)
-    * osp::affine3f::translate(-du * viewport.frame.l.vx);
+  ospray::affine3f xfm = ospray::affine3f::translate(dv * viewport.frame.l.vz)
+    * ospray::affine3f::translate(-du * viewport.frame.l.vx);
 
   viewport.frame = xfm * viewport.frame;
   viewport.from = xfmPoint(xfm, viewport.from);
@@ -283,9 +341,34 @@ void QOSPRayWindow::strafe(float du, float dv)
   viewport.modified = true;
 }
 
-void QOSPRayWindow::writeFrameBufferToFile(const uint32 *pixelData)
+void QOSPRayWindow::renderGL()
 {
-  static uint32 frameNumber = 0;
+  // setup OpenGL state to match OSPRay view
+  const ospray::vec3f bgColor = ospray::vec3f(1.f);
+  glClearColor(bgColor.x, bgColor.y, bgColor.z, 1.f);
+
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+
+  float zNear = 0.1f;
+  float zFar = 100000.f;
+  gluPerspective(viewport.fovY, viewport.aspect, zNear, zFar);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  gluLookAt(viewport.from.x, viewport.from.y, viewport.from.z,
+            viewport.at.x, viewport.at.y, viewport.at.z,
+            viewport.up.x, viewport.up.y, viewport.up.z);
+
+  // emit signal to render all OpenGL components; the slots will execute in the order they were registered
+  emit(renderGLComponents());
+}
+
+void QOSPRayWindow::writeFrameBufferToFile(const uint32_t *pixelData)
+{
+  static uint32_t frameNumber = 0;
   char filename[1024];
   sprintf(filename, "%s_%05u.ppm", writeFramesFilename.c_str(), frameNumber++);
   FILE *file = fopen(filename, "wb");  if (!file) { std::cerr << "unable to write to file '" << filename << "'" << std::endl;  return; }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -30,14 +30,16 @@ struct Spheres {
 
   uniform uint8 *uniform data;
   uniform Material *uniform *materialList;
+  uniform vec4f    *uniform color;
 
-  float           radius;
-  int             materialID;
-  int             offset_center;
-  int             offset_radius;
-  int             offset_materialID;
-  int32           numSpheres;
-  int32           bytesPerSphere;
+  float radius;
+  int   materialID;
+  int   offset_center;
+  int   offset_radius;
+  int   offset_materialID;
+  int   offset_colorID;
+  int32 numSpheres;
+  int32 bytesPerSphere;
 };
 
 typedef uniform float uniform_float;
@@ -52,29 +54,36 @@ static void Spheres_postIntersect(uniform Geometry *uniform geometry,
 
   dg.Ng = dg.Ns = ray.Ng;
 
+  if ((flags & DG_COLOR) && self->color) {
+    if (self->offset_colorID >= 0) {
+      uniform uint8 *varying spherePtr = self->data + self->bytesPerSphere*ray.primID;
+      uint32 colorID = *((uniform uint32 *varying)(spherePtr+self->offset_colorID));
+      dg.color = self->color[colorID];
+    } else {
+      dg.color = self->color[ray.primID];
+    }
+  }
+
   if ((flags & DG_MATERIALID) && (self->offset_materialID >= 0)) {
-    const uniform int32 primsPerPage = (1024*1024*128);
+    const uniform int32 primsPerPage = (1024*1024*64);
     if (any(ray.primID >= primsPerPage )) {
       const int primPageID  = ray.primID / primsPerPage;
       const int localPrimID = ray.primID % primsPerPage;
       foreach_unique(primPage in primPageID) {
-        uniform uint8 *uniform pagePtr = self->data + (((int64)primPage) * primsPerPage * self->bytesPerSphere);
-        uniform uint8 *spherePtr = 
-          pagePtr + self->bytesPerSphere*localPrimID;
+        uniform uint8 *uniform pagePtr   = self->data + (((int64)primPage) * primsPerPage * self->bytesPerSphere);
+        uniform uint8 *varying spherePtr = pagePtr + self->bytesPerSphere*localPrimID;
         dg.materialID = *((uniform uint32 *varying)(spherePtr+self->offset_materialID));
         if (self->materialList) {
           dg.material = self->materialList[dg.materialID];
         }
       }
-    } else
-      {
-        uniform uint8 *spherePtr = 
-          self->data + self->bytesPerSphere*ray.primID;
-        dg.materialID = *((uniform uint32 *varying)(spherePtr+self->offset_materialID));
-        if (self->materialList) {
-          dg.material = self->materialList[dg.materialID];
-        }
+    } else {
+      uniform uint8 *varying spherePtr = self->data + self->bytesPerSphere*ray.primID;
+      dg.materialID = *((uniform uint32 *varying)(spherePtr+self->offset_materialID));
+      if (self->materialList) {
+        dg.material = self->materialList[dg.materialID];
       }
+    }
   }
 }
 
@@ -84,10 +93,11 @@ void Spheres_bounds(uniform Spheres *uniform geometry,
 {
   uniform uint8 *uniform spherePtr = geometry->data + geometry->bytesPerSphere*((uniform int64)primID);
   uniform float radius = geometry->radius;
+  
   if (geometry->offset_radius >= 0) {
-    radius = *((uniform float *)(spherePtr+geometry->offset_radius));
+    radius = *((uniform float *uniform)(spherePtr+geometry->offset_radius));
   }
-  uniform vec3f center = *((uniform vec3f*)(spherePtr+geometry->offset_center));
+  uniform vec3f center = *((uniform vec3f*uniform)(spherePtr+geometry->offset_center));
   bbox = make_box3fa(center-make_vec3f(radius),center+make_vec3f(radius));
 }
 
@@ -98,9 +108,9 @@ void Spheres_intersect(uniform Spheres *uniform geometry,
   uniform uint8 *uniform spherePtr = geometry->data + geometry->bytesPerSphere*((uniform int64)primID);
   uniform float radius = geometry->radius;
   if (geometry->offset_radius >= 0) {
-    radius = *((uniform float *)(spherePtr+geometry->offset_radius));
+    radius = *((uniform float *uniform)(spherePtr+geometry->offset_radius));
   }
-  uniform vec3f center = *((uniform vec3f*)(spherePtr+geometry->offset_center));
+  uniform vec3f center = *((uniform vec3f*uniform)(spherePtr+geometry->offset_center));
   const vec3f A = center - ray.org;
 
   const float a = dot(ray.dir,ray.dir);
@@ -126,9 +136,10 @@ void Spheres_intersect(uniform Spheres *uniform geometry,
   if (hit) {
     ray.primID = primID;
     ray.geomID = geometry->geometry.geomID;
+    ray.instID = -1;
     // cannot easily be moved to postIntersect
     // we need hit in object space, in postIntersect it is in world-space
-    ray.Ng = ray.org + ray.t*ray.dir - center;
+    ray.Ng = normalize(ray.org + ray.t*ray.dir - center);
   }
 }
 
@@ -146,13 +157,15 @@ export void SpheresGeometry_set(void           *uniform _geom,
                                 void           *uniform _model,
                                 void           *uniform data,
                                 void           *uniform materialList,
+                                uniform vec4f  *uniform color,
                                 int             uniform numSpheres,
                                 int             uniform bytesPerSphere,
                                 float           uniform radius,
                                 int             uniform materialID,
                                 int             uniform offset_center,
                                 int             uniform offset_radius,
-                                int             uniform offset_materialID)
+                                int             uniform offset_materialID,
+                                int             uniform offset_colorID)
 {
   uniform Spheres *uniform geom = (uniform Spheres *uniform)_geom;
   uniform Model *uniform model = (uniform Model *uniform)_model;
@@ -162,6 +175,7 @@ export void SpheresGeometry_set(void           *uniform _geom,
   geom->geometry.model = model;
   geom->geometry.geomID = geomID;
   geom->materialList = (Material **)materialList;
+  geom->color = color;
   geom->numSpheres = numSpheres;
   geom->radius = radius;
   geom->data = (uniform uint8 *uniform)data;
@@ -171,6 +185,7 @@ export void SpheresGeometry_set(void           *uniform _geom,
   geom->offset_center     = offset_center;
   geom->offset_radius     = offset_radius;
   geom->offset_materialID = offset_materialID;
+  geom->offset_colorID    = offset_colorID;
 
   rtcSetUserData(model->embreeSceneHandle,geomID,geom);
   rtcSetBoundsFunction(model->embreeSceneHandle,geomID,

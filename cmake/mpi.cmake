@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2016 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -15,65 +15,50 @@
 ## ======================================================================== ##
 
 IF (OSPRAY_MPI)
-  if (OSPRAY_COMPILER STREQUAL "ICC")
-    find_program(MPI_COMPILER 
-      NAMES mpiicpc
-      DOC "MPI compiler.")
-    SET(OSPRAY_MPI_MULTI_THREADING_FLAG "-mt_mpi")
-  else()
-    find_package(MPI)
-    if (${MPI_COMPILER} STREQUAL "MPI_COMPILER-NOTFOUND")
-      find_program(MPI_COMPILER
-        NAMES mpicxx
-        PATHS /usr/lib64/openmpi/bin
-        DOC "MPI compiler.")
-      find_library(MPI_LIBRARY
-        NAMES mpi
-        PATHS /usr/lib64/openmpi/lib
-        DOC "MPI library.")
-      SET(MPI_LIBRARIES ${MPI_LIBRARY})
-    endif()
-    SET(OSPRAY_MPI_MULTI_THREADING_FLAG "") #???
-  endif()
-  if (${MPI_COMPILER} STREQUAL "MPI_COMPILER-NOTFOUND")
-    message("could not find mpi compiler")
-  endif()
-  mark_as_advanced(MPI_COMPILER)
-
-  exec_program(${MPI_COMPILER} 
-    ARGS -show
-    OUTPUT_VARIABLE MPI_COMPILE_CMDLINE
-    RETURN_VALUE MPI_COMPILER_RETURN)
-
-  # Extract include paths from compile command line
-  string(REGEX MATCHALL "-I([^\" ]+|\"[^\"]+\")" MPI_ALL_INCLUDE_PATHS "${MPI_COMPILE_CMDLINE}")
-  set(MPI_INCLUDE_PATH_WORK)
-  foreach(IPATH ${MPI_ALL_INCLUDE_PATHS})
-    string(REGEX REPLACE "^-I" "" IPATH ${IPATH})
-    string(REGEX REPLACE "//" "/" IPATH ${IPATH})
-    list(APPEND MPI_INCLUDE_PATH_WORK ${IPATH})
-  endforeach(IPATH)
-
-  set(MPI_INCLUDE_PATH ${MPI_INCLUDE_PATH_WORK} )
+  SET(OSPRAY_MPI_DISTRIBUTED ON) # sets this define in OSPConfig.h
 
   MACRO(CONFIGURE_MPI)
-    INCLUDE_DIRECTORIES(${MPI_INCLUDE_PATH})
-    SET(CMAKE_CXX_COMPILER ${MPI_COMPILER})
-    SET(APP_CMAKE_CXX_FLAGS "${OSPRAY_MPI_MULTI_THREADING_FLAG}")
-    SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    SET(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}")
-    SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${OSPRAY_MPI_MULTI_THREADING_FLAG}")
-    SET(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${OSPRAY_MPI_MULTI_THREADING_FLAG}")
 
-    IF (THIS_IS_MIC)
-      SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -mmic" )
+    IF (WIN32) # FindMPI does not find Intel MPI on Windows, we need to help here
+      FIND_PACKAGE(MPI)
+
+      # need to strip quotes, otherwise CMake treats it as relative path
+      STRING(REGEX REPLACE "^\"|\"$" "" MPI_CXX_INCLUDE_PATH ${MPI_CXX_INCLUDE_PATH})
+
+      IF (NOT MPI_CXX_FOUND)
+        # try again, hinting the compiler wrappers
+        SET(MPI_CXX_COMPILER mpicxx.bat)
+        SET(MPI_C_COMPILER mpicc.bat)
+        FIND_PACKAGE(MPI)
+
+        IF (NOT MPI_CXX_LIBRARIES)
+          SET(MPI_LIB_PATH ${MPI_CXX_INCLUDE_PATH}\\..\\lib)
+
+          SET(MPI_LIB "MPI_LIB-NOTFOUND" CACHE FILEPATH "Cleared" FORCE)
+          FIND_LIBRARY(MPI_LIB NAMES impi HINTS ${MPI_LIB_PATH})
+          SET(MPI_C_LIB ${MPI_LIB})
+          SET(MPI_C_LIBRARIES ${MPI_LIB} CACHE STRING "MPI C libraries to link against" FORCE)
+
+          SET(MPI_LIB "MPI_LIB-NOTFOUND" CACHE FILEPATH "Cleared" FORCE)
+          FIND_LIBRARY(MPI_LIB NAMES impicxx HINTS ${MPI_LIB_PATH})
+          SET(MPI_CXX_LIBRARIES ${MPI_C_LIB} ${MPI_LIB} CACHE STRING "MPI CXX libraries to link against" FORCE)
+          SET(MPI_LIB "MPI_LIB-NOTFOUND" CACHE INTERNAL "Scratch variable for MPI lib detection" FORCE)
+        ENDIF()
+      ENDIF()
+    ELSE()
+      FIND_PACKAGE(MPI REQUIRED)
+      IF(MPI_CXX_FOUND)
+        GET_FILENAME_COMPONENT(DIR ${MPI_LIBRARY} PATH)
+        SET(MPI_LIBRARY_MIC ${DIR}/../../mic/lib/libmpi.so CACHE FILEPATH "")
+      ENDIF()
     ENDIF()
 
-  ENDMACRO()
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
 
-  IF (THIS_IS_MIC)
-    INCLUDE(${PROJECT_SOURCE_DIR}/cmake/icc_xeonphi.cmake)
-  ENDIF()
+    INCLUDE_DIRECTORIES(SYSTEM ${MPI_CXX_INCLUDE_PATH})
+
+  ENDMACRO()
 
 ELSE()
   MACRO(CONFIGURE_MPI)

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -41,7 +41,7 @@ public slots:
   void load(std::string filename = std::string());
 
   //! Set the data value range for the transfer function editor.
-  void setDataValueRange(osp::vec2f dataValueRange, bool force=false);
+  void setDataValueRange(ospray::vec2f dataValueRange, bool force=false);
 
   //! Slot called to update transfer function opacity values based on widget values.
   void updateOpacityValues();

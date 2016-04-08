@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -57,6 +57,11 @@ static void Instance_postIntersect(uniform Geometry *uniform _self,
   // XXX this is wrong when the transformation contains non-uniform scaling!
   dg.Ns = xfmVector(self->xfm,dg.Ns);
   dg.Ng = xfmVector(self->xfm,dg.Ng);
+
+  if (flags & DG_TANGENTS) {
+    dg.dPds = xfmVector(self->xfm,dg.dPds);
+    dg.dPdt = xfmVector(self->xfm,dg.dPdt);
+  }
 }
 
 export void *uniform InstanceGeometry_create(void *uniform cppE)

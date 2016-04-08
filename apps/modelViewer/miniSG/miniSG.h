@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -65,7 +65,7 @@ namespace ospray {
         } DataType;
 
         void clear() {
-          assert(this && "Tried to clear a null parameter");
+          Assert2(this != NULL, "Tried to clear a null parameter");
           switch( type ) {
             case STRING:
               if (s) free((void*)s);
@@ -211,7 +211,11 @@ namespace ospray {
       affine3f xfm;
       int meshID;
       
-      Instance(int meshID=0, affine3f xfm=embree::one) : meshID(meshID), xfm(xfm) {};
+      OSPGeometry ospGeometry;
+
+      Instance(int meshID=0, affine3f xfm=embree::one) 
+        : meshID(meshID), xfm(xfm), ospGeometry(NULL) 
+      {};
     };
     bool operator==(const Instance &a, const Instance &b);
     bool operator!=(const Instance &a, const Instance &b);

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,8 @@
 #include "miniSG.h"
 #include "importer.h"
 #include <fstream>
+#include <cmath>
+#include <string>
 
 /*! the boeing 777 model does not actually have a 'mtl' file; instead,
   as materials it has a single RBG diffuse color that's encoded in
@@ -266,7 +268,11 @@ namespace ospray {
             continue;
           }
 
-          if (!cur) throw std::runtime_error("invalid material file: newmtl expected first");
+          if (!cur) {
+            //throw std::runtime_error("invalid material file: newmtl expected first");
+            cout << "#osp:minisg:parseOBJ (Warning): cannot parse input line " << line << endl;
+            continue;
+          }
 
           if (!strncmp(token, "illum_4",7)) { 
             /*! iw: hack for VMD-exported OBJ files, working ardouna

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,12 +22,23 @@
 #include "common/sys/filename.h"
 // stl
 #include <stack>
+#include <vector>
+
+#ifdef _WIN32
+#  ifdef ospray_xml_EXPORTS
+#    define OSPRAY_XML_INTERFACE __declspec(dllexport)
+#  else
+#    define OSPRAY_XML_INTERFACE __declspec(dllimport)
+#  endif
+#else
+#  define OSPRAY_XML_INTERFACE
+#endif
 
 namespace ospray {
   namespace xml {
 
+    struct Node;
     using embree::FileName;
-
     struct XMLDoc;
 
     /*! 'prop'erties in xml nodes are the 'name="value"' inside the
@@ -36,6 +47,7 @@ namespace ospray {
       std::string name;
       std::string value;
     };
+
     /*! a XML node, consisting of a name, a list of properties, and a
       set of child nodes */
     struct Node {
@@ -95,7 +107,7 @@ namespace ospray {
       to it.  In case of any error, this function will free all
       already-allocated data, and throw a std::runtime_error
       exception */
-    XMLDoc *readXML(const std::string &fn);
+    OSPRAY_XML_INTERFACE XMLDoc *readXML(const std::string &fn);
 
       
     /*! @{ */

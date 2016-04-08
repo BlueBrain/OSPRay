@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,7 @@
 
 #include "modules/loaders/OSPObjectFile.h"
 #include "modules/loaders/RawVolumeFile.h"
+#include "modules/loaders/RMVolumeFile.h"
 #include "modules/loaders/PLYTriangleMeshFile.h"
 
 // Loader for XML object files.
@@ -23,6 +24,10 @@ OSP_REGISTER_OBJECT_FILE(OSPObjectFile, osp);
 
 // Loader for RAW volume files.
 OSP_REGISTER_VOLUME_FILE(RawVolumeFile, raw);
+OSP_REGISTER_VOLUME_FILE(RawVolumeFile, gz);
 
 // Loader for PLY triangle mesh files.
 OSP_REGISTER_TRIANGLEMESH_FILE(PLYTriangleMeshFile, ply);
+
+// Loader for RAW volume files.
+OSP_REGISTER_VOLUME_FILE(RMVolumeFile, bob);

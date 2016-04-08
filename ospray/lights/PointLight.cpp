@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,7 +22,7 @@ namespace ospray {
     : position(0.f)
     , color(1.f)
     , intensity(1.f)
-    , range(inf)
+    , radius(0.f)
   {
     ispcEquivalent = ispc::PointLight_create(this);
   }
@@ -32,12 +32,14 @@ namespace ospray {
     position  = getParam3f("position", vec3f(0.f));
     color     = getParam3f("color", vec3f(1.f));
     intensity = getParam1f("intensity", 1.f);
-    range     = getParam1f("range", inf);
+    radius    = getParam1f("radius", 0.f);
 
     vec3f power = color * intensity;
 
-    ispc::PointLight_set(getIE(), (ispc::vec3f&)position, (ispc::vec3f&)power, range);
+    ispc::PointLight_set(getIE(), (ispc::vec3f&)position, (ispc::vec3f&)power, radius);
   }
 
   OSP_REGISTER_LIGHT(PointLight, PointLight);
+  OSP_REGISTER_LIGHT(PointLight, SphereLight);
+  OSP_REGISTER_LIGHT(PointLight, sphere);
 }

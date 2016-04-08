@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,7 +17,7 @@
 #pragma once
 
 /*! \defgroup ospray_render_raycast A Family of Simple Ray-Cast Renderers
-  
+
   \ingroup ospray_supported_renderers
 
   \brief Implements a simple renderer that uses a camera given camera
@@ -51,10 +51,7 @@
 
 namespace ospray {
 
-  struct Camera;
-  struct Model;
-
-  /*! \brief Implements the family of simple, primary-ray-only ray cast renderers 
+  /*! \brief Implements the family of simple, primary-ray-only ray cast renderers
 
     \detailed This simple renderer shoots only a single primary ray
     and does some simple shading, mostly for debugging purposes such
@@ -66,7 +63,7 @@ namespace ospray {
     /*! \brief constructor */
     RaycastRenderer();
 
-    //! \brief common function to help printf-debugging 
+    //! \brief common function to help printf-debugging
     /*! \detailed Every derived class should overrride this! */
     virtual std::string toString() const;
   };

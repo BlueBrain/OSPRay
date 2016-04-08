@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -43,11 +43,8 @@
 #include <vector>
 
 namespace ospray {
-  struct Camera;
-  struct Model;
 
   namespace obj {
-    using embree::TaskScheduler;
 
     /*! \brief Renderer for the OBJ Wavefront Material/Lighting format 
 
@@ -56,17 +53,11 @@ namespace ospray {
     struct OBJRenderer : public Renderer {
       OBJRenderer();
       virtual std::string toString() const { return "ospray::OBJRenderer"; }
+      virtual void commit();
+      virtual Material *createMaterial(const char *type);
 
       std::vector<void*> lightArray; // the 'IE's of the XXXLights
-
-      Model    *world;
-      Camera   *camera;
-      Data     *lightData;
-      
-      virtual void commit();
-
-      /*! \brief create a material of given type */
-      virtual Material *createMaterial(const char *type);
+      Data *lightData;
     };
 
   } // ::ospray::api

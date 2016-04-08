@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <ospray/ospray.h>
+#include "ospray/common/OSPCommon.h"
 #include <QtGui>
 #include <vector>
-#include <ospray/ospray.h>
 
 class VolumeViewer;
 
@@ -28,7 +29,7 @@ Q_OBJECT
 
 public:
 
-  PreferencesDialog(VolumeViewer *volumeViewer, osp::box3f boundingBox);
+  PreferencesDialog(VolumeViewer *volumeViewer, ospray::box3f boundingBox);
 
 protected slots:
 

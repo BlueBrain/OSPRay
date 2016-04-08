@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2016 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -18,10 +18,15 @@ IF (NOT OSPRAY_MODULE_LOADERS)
   message(FATAL_ERROR "The 'loaders' module must be enabled to build the 'ospVolumeViewer' application.")
 ENDIF (NOT OSPRAY_MODULE_LOADERS)
 
+IF (NOT OSPRAY_MODULE_OPENGL_UTIL)
+  message(FATAL_ERROR "The 'OpenGL util' module must be enabled to build the 'ospVolumeViewer' application.")
+ENDIF (NOT OSPRAY_MODULE_OPENGL_UTIL)
+
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ospray/include)
 
 # setup dependencies
 SET(LIBS ${LIBS} ospray ospray_module_loaders)
+SET(LIBS ${LIBS} ospray ospray_module_opengl_util)
 
 # link optional loaders-based modules if built
 IF (OSPRAY_MODULE_SEISMIC)
@@ -35,7 +40,7 @@ SET(LIBS ${LIBS} ${QT_LIBRARIES})
 
 FIND_PACKAGE(OpenGL REQUIRED)
 INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIRS})
-SET(LIBS ${LIBS} ${OPENGL_LIBRARIES})
+SET(LIBS ${LIBS} ${OPENGL_LIBRARIES} ${TBB_LIBRARY_MALLOC} ${TBB_LIBRARY})
 
 SET(SRCS ${SRCS}
   main.cpp
@@ -44,7 +49,9 @@ SET(SRCS ${SRCS}
   IsovalueWidget.cpp
   LightEditor.cpp
   LinearTransferFunctionWidget.cpp
+  OpenGLAnnotationRenderer.cpp
   PreferencesDialog.cpp
+  ProbeWidget.cpp
   QOSPRayWindow.cpp
   SliceEditor.cpp
   SliceWidget.cpp
@@ -57,7 +64,10 @@ SET(MOC_HEADERS
   IsovalueWidget.h
   LightEditor.h
   LinearTransferFunctionWidget.h
+  OpenGLAnnotationRenderer.h
   PreferencesDialog.h
+  ProbeWidget.h
+  QOSPRayWindow.h
   SliceEditor.h
   SliceWidget.h
   TransferFunctionEditor.h
@@ -68,7 +78,7 @@ QT4_WRAP_CPP(MOC_OUTFILES ${MOC_HEADERS})
 
 ADD_EXECUTABLE(ospVolumeViewer ${SRCS} ${MOC_OUTFILES})
 TARGET_LINK_LIBRARIES(ospVolumeViewer ${LIBS})
-# ------------------------------------------------------------
-INSTALL(TARGETS ospVolumeViewer DESTINATION bin)
-# ------------------------------------------------------------
-
+INSTALL(TARGETS ospVolumeViewer
+  DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT apps
+)

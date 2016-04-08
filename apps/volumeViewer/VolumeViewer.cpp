@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -14,28 +14,40 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
+#include "ospray/common/OSPCommon.h"
+#include "VolumeViewer.h"
 #include <algorithm>
 #include "modules/loaders/ObjectFile.h"
 #include "modules/loaders/TriangleMeshFile.h"
-#include "VolumeViewer.h"
 #include "TransferFunctionEditor.h"
 #include "IsosurfaceEditor.h"
 #include "LightEditor.h"
 #include "SliceEditor.h"
 #include "PreferencesDialog.h"
+#include "ProbeWidget.h"
+#include "OpenGLAnnotationRenderer.h"
+
+#ifdef OSPRAY_VOLUME_VOXELRANGE_IN_APP
+#include "../../modules/loaders/VolumeFile.h"
+#endif
 
 VolumeViewer::VolumeViewer(const std::vector<std::string> &objectFileFilenames,
+                           std::string renderer_type,
+                           bool ownModelPerObject,
                            bool showFrameRate,
                            bool fullScreen,
                            std::string writeFramesFilename)
   : objectFileFilenames(objectFileFilenames),
     modelIndex(0),
-    boundingBox(osp::vec3f(0.f), osp::vec3f(1.f)),
+    ownModelPerObject(ownModelPerObject),
+    boundingBox(ospray::vec3f(0.f), ospray::vec3f(1.f)),
     renderer(NULL),
     rendererInitialized(false),
     transferFunction(NULL),
-    light(NULL),
+    ambientLight(NULL),
+    directionalLight(NULL),
     osprayWindow(NULL),
+    annotationRenderer(NULL),
     transferFunctionEditor(NULL),
     isosurfaceEditor(NULL),
     autoRotateAction(NULL),
@@ -45,23 +57,39 @@ VolumeViewer::VolumeViewer(const std::vector<std::string> &objectFileFilenames,
   resize(1024, 768);
 
   // Create and configure the OSPRay state.
-  initObjects();
-
-  // Configure the user interface widgets and callbacks.
-  initUserInterfaceWidgets();
+  initObjects(renderer_type);
 
   // Create an OSPRay window and set it as the central widget, but don't let it start rendering until we're done with setup.
-  osprayWindow = new QOSPRayWindow(this, renderer, showFrameRate, writeFramesFilename);
+  osprayWindow = new QOSPRayWindow(this, this->renderer,
+                                   showFrameRate, writeFramesFilename);
   setCentralWidget(osprayWindow);
 
   // Set the window bounds based on the OSPRay world bounds.
   osprayWindow->setWorldBounds(boundingBox);
+
+  // Configure the user interface widgets and callbacks.
+  initUserInterfaceWidgets();
 
   if (fullScreen)
     setWindowState(windowState() | Qt::WindowFullScreen);
 
   // Show the window.
   show();
+}
+
+ospray::box3f VolumeViewer::getBoundingBox()
+{
+  return boundingBox;
+}
+
+QOSPRayWindow *VolumeViewer::getWindow()
+{
+  return osprayWindow;
+}
+
+TransferFunctionEditor *VolumeViewer::getTransferFunctionEditor()
+{
+  return transferFunctionEditor;
 }
 
 void VolumeViewer::setModel(size_t index)
@@ -74,18 +102,35 @@ void VolumeViewer::setModel(size_t index)
   rendererInitialized = true;
 
   // Update transfer function and isosurface editor data value range with the voxel range of the current model's first volume.
-  osp::vec2f voxelRange(0.f);  ospGetVec2f(modelStates[index].volumes[0], "voxelRange", &voxelRange);
+  ospray::vec2f voxelRange(0.f); 
+  OSPVolume volume = modelStates[index].volumes[0];
+#ifdef OSPRAY_VOLUME_VOXELRANGE_IN_APP
+  voxelRange = VolumeFile::voxelRangeOf[volume];
+#else
+  ospGetVec2f(modelStates[index].volumes[0], "voxelRange", (osp::vec2f*)&voxelRange);
+#endif
 
-  if(voxelRange != osp::vec2f(0.f)) {
+  if(voxelRange != ospray::vec2f(0.f)) {
     transferFunctionEditor->setDataValueRange(voxelRange);
     isosurfaceEditor->setDataValueRange(voxelRange);
   }
 
+  // Update active volume on probe widget.
+  probeWidget->setVolume(modelStates[index].volumes[0]);
+
   // Update current filename information label.
-  currentFilenameInfoLabel.setText("<b>Timestep " + QString::number(index) + QString("</b>: ") + QString(objectFileFilenames[index].c_str()).split('/').back() + ". Data value range: [" + QString::number(voxelRange.x) + ", " + QString::number(voxelRange.y) + "]");
+  if (ownModelPerObject)
+    currentFilenameInfoLabel.setText("<b>Timestep " + QString::number(index) + QString("</b>: Data value range: [") + QString::number(voxelRange.x) + ", " + QString::number(voxelRange.y) + "]");
+  else
+    currentFilenameInfoLabel.setText("<b>Timestep " + QString::number(index) + QString("</b>: ") + QString(objectFileFilenames[index].c_str()).split('/').back() + ". Data value range: [" + QString::number(voxelRange.x) + ", " + QString::number(voxelRange.y) + "]");
 
   // Enable rendering on the OSPRay window.
   osprayWindow->setRenderingEnabled(true);
+}
+
+std::string VolumeViewer::toString() const
+{
+  return("VolumeViewer");
 }
 
 void VolumeViewer::autoRotate(bool set)
@@ -102,6 +147,26 @@ void VolumeViewer::autoRotate(bool set)
   }
   else
     osprayWindow->setRotationRate(0.);
+}
+
+void VolumeViewer::setAutoRotationRate(float rate)
+{
+  autoRotationRate = rate;
+}
+
+void VolumeViewer::nextTimeStep()
+{
+  modelIndex = (modelIndex + 1) % modelStates.size();
+  setModel(modelIndex);
+  render();
+}
+
+void VolumeViewer::playTimeSteps(bool animate)
+{
+  if (animate == true)
+    playTimeStepsTimer.start(500);
+  else
+    playTimeStepsTimer.stop();
 }
 
 void VolumeViewer::addSlice(std::string filename)
@@ -121,7 +186,7 @@ void VolumeViewer::addGeometry(std::string filename)
     return;
 
   // Attempt to load the geometry through the TriangleMeshFile loader.
-  OSPTriangleMesh triangleMesh = ospNewTriangleMesh();
+  OSPGeometry triangleMesh = ospNewGeometry("trianglemesh");
 
   // If successful, commit the triangle mesh and add it to all models.
   if(TriangleMeshFile::importTriangleMesh(filename, triangleMesh) != NULL) {
@@ -130,7 +195,7 @@ void VolumeViewer::addGeometry(std::string filename)
     if(QString(filename.c_str()).endsWith(".dds") && modelStates.size() > 0 && modelStates[0].volumes.size() > 0) {
 
       OSPMaterial material = ospNewMaterial(renderer, "default");
-      ospSetVec3f(material, "Kd", osp::vec3f(1.f));
+      ospSet3f(material, "Kd", 1,1,1);
       ospSetObject(material, "volume", modelStates[0].volumes[0]);
       ospCommit(material);
 
@@ -139,8 +204,18 @@ void VolumeViewer::addGeometry(std::string filename)
 
     ospCommit(triangleMesh);
 
+    // Create an instance of the geometry and add the instance to the main model(s)--this prevents the geometry
+    // from being rebuilt every time the main model is committed (e.g. when slices / isosurfaces are manipulated)
+    OSPModel modelInstance = ospNewModel();
+    ospAddGeometry(modelInstance, triangleMesh);
+    ospCommit(modelInstance);
+
+    ospray::affine3f xfm = embree::one;
+    OSPGeometry triangleMeshInstance = ospNewInstance(modelInstance, (osp::affine3f&)xfm);
+    ospCommit(triangleMeshInstance);
+
     for(size_t i=0; i<modelStates.size(); i++) {
-      ospAddGeometry(modelStates[i].model, triangleMesh);
+      ospAddGeometry(modelStates[i].model, triangleMeshInstance);
       ospCommit(modelStates[i].model);
     }
 
@@ -151,6 +226,10 @@ void VolumeViewer::addGeometry(std::string filename)
 
 void VolumeViewer::screenshot(std::string filename)
 {
+  // Print current camera view parameters (can be used on command line to recreate view)
+  std::cout << "screenshot view parameters (use on command line to reproduce view): " << std::endl
+            << "  " << *(osprayWindow->getViewport()) << std::endl;
+
   // Get filename if not specified.
   if(filename.empty())
     filename = QFileDialog::getSaveFileName(this, tr("Save screenshot"), ".", "PNG files (*.png)").toStdString();
@@ -169,6 +248,44 @@ void VolumeViewer::screenshot(std::string filename)
   bool success = image.save(filename.c_str());
 
   std::cout << (success ? "saved screenshot to " : "failed saving screenshot ") << filename << std::endl;
+}
+
+void VolumeViewer::commitVolumes()
+{
+  for(size_t i=0; i<modelStates.size(); i++)
+    for(size_t j=0; j<modelStates[i].volumes.size(); j++)
+      ospCommit(modelStates[i].volumes[j]);
+}
+
+void VolumeViewer::render()
+{
+  if (osprayWindow != NULL) {
+    osprayWindow->resetAccumulationBuffer();
+    osprayWindow->updateGL();
+  }
+}
+
+void VolumeViewer::setRenderAnnotationsEnabled(bool value)
+{
+  if (value) {
+    if (!annotationRenderer)
+      annotationRenderer = new OpenGLAnnotationRenderer(this);
+
+    connect(osprayWindow, SIGNAL(renderGLComponents()), annotationRenderer, SLOT(render()), Qt::UniqueConnection);
+  }
+  else {
+    delete annotationRenderer;
+    annotationRenderer = NULL;
+  }
+
+  render();
+}
+
+void VolumeViewer::setSubsamplingInteractionEnabled(bool value)
+{
+  ospSet1i(renderer, "spp", value ? -1 : 1);
+  if(rendererInitialized)
+    ospCommit(renderer);
 }
 
 void VolumeViewer::setGradientShadingEnabled(bool value)
@@ -193,7 +310,7 @@ void VolumeViewer::setSamplingRate(double value)
   render();
 }
 
-void VolumeViewer::setVolumeClippingBox(osp::box3f value)
+void VolumeViewer::setVolumeClippingBox(ospray::box3f value)
 {
   for(size_t i=0; i<modelStates.size(); i++)
     for(size_t j=0; j<modelStates[i].volumes.size(); j++) {
@@ -208,10 +325,10 @@ void VolumeViewer::setVolumeClippingBox(osp::box3f value)
 void VolumeViewer::setSlices(std::vector<SliceParameters> sliceParameters)
 {
   // Provide the slices to OSPRay as the coefficients (a,b,c,d) of the plane equation ax + by + cz + d = 0.
-  std::vector<osp::vec4f> planes;
+  std::vector<ospray::vec4f> planes;
 
   for(size_t i=0; i<sliceParameters.size(); i++)
-    planes.push_back(osp::vec4f(sliceParameters[i].normal.x,
+    planes.push_back(ospray::vec4f(sliceParameters[i].normal.x,
                                 sliceParameters[i].normal.y,
                                 sliceParameters[i].normal.z,
                                 -dot(sliceParameters[i].origin, sliceParameters[i].normal)));
@@ -286,14 +403,18 @@ void VolumeViewer::setIsovalues(std::vector<float> isovalues)
 
 void VolumeViewer::importObjectsFromFile(const std::string &filename)
 {
+  if (!ownModelPerObject)
   // Create an OSPRay model and its associated model state.
   modelStates.push_back(ModelState(ospNewModel()));
 
   // Load OSPRay objects from a file.
   OSPObject *objects = ObjectFile::importObjects(filename.c_str());
 
-  // Iterate over the volumes contained in the object list.
+  // Iterate over the objects contained in the object list.
   for (size_t i=0 ; objects[i] ; i++) {
+    if (ownModelPerObject)
+      modelStates.push_back(ModelState(ospNewModel()));
+
     OSPDataType type;
     ospGetType(objects[i], NULL, &type);
 
@@ -317,27 +438,37 @@ void VolumeViewer::importObjectsFromFile(const std::string &filename)
       // Add to volumes vector for the current model.
       modelStates.back().volumes.push_back((OSPVolume) objects[i]);
     }
+
+    if (ownModelPerObject)
+      ospCommit(modelStates.back().model);
   }
 
+  if (!ownModelPerObject)
   // Commit the model.
   ospCommit(modelStates.back().model);
 }
 
-void VolumeViewer::initObjects()
+void VolumeViewer::initObjects(const std::string &renderer_type)
 {
   // Create an OSPRay renderer.
-  renderer = ospNewRenderer("raycast_volume_renderer");
+  renderer = ospNewRenderer(renderer_type.c_str());
   exitOnCondition(renderer == NULL, "could not create OSPRay renderer object");
 
-  // Create an OSPRay light source.
-  light = ospNewLight(NULL, "DirectionalLight");
-  exitOnCondition(light == NULL, "could not create OSPRay light object");
-  ospSet3f(light, "direction", 1.0f, -2.0f, -1.0f);
-  ospSet3f(light, "color", 1.0f, 1.0f, 1.0f);
-  ospCommit(light);
+  // Create OSPRay ambient and directional lights. GUI elements will modify their parameters.
+  ambientLight = ospNewLight(renderer, "AmbientLight");
+  exitOnCondition(ambientLight == NULL, "could not create ambient light");
+  ospCommit(ambientLight);
 
-  // Set the light source on the renderer.
-  ospSetData(renderer, "lights", ospNewData(1, OSP_OBJECT, &light));
+  directionalLight = ospNewLight(renderer, "DirectionalLight");
+  exitOnCondition(directionalLight == NULL, "could not create directional light");
+  ospCommit(directionalLight);
+
+  // Set the light sources on the renderer.
+  std::vector<OSPLight> lights;
+  lights.push_back(ambientLight);
+  lights.push_back(directionalLight);
+
+  ospSetData(renderer, "lights", ospNewData(lights.size(), OSP_OBJECT, &lights[0]));
 
   // Create an OSPRay transfer function.
   transferFunction = ospNewTransferFunction("piecewise_linear");
@@ -350,13 +481,13 @@ void VolumeViewer::initObjects()
 
   // Get the bounding box of all volumes of the first model.
   if(modelStates.size() > 0 && modelStates[0].volumes.size() > 0) {
-    ospGetVec3f(modelStates[0].volumes[0], "boundingBoxMin", &boundingBox.lower);
-    ospGetVec3f(modelStates[0].volumes[0], "boundingBoxMax", &boundingBox.upper);
+    ospGetVec3f(modelStates[0].volumes[0], "boundingBoxMin", (osp::vec3f*)&boundingBox.lower);
+    ospGetVec3f(modelStates[0].volumes[0], "boundingBoxMax", (osp::vec3f*)&boundingBox.upper);
 
     for (size_t i=1; i<modelStates[0].volumes.size(); i++) {
-      osp::box3f volumeBoundingBox;
-      ospGetVec3f(modelStates[0].volumes[i], "boundingBoxMin", &volumeBoundingBox.lower);
-      ospGetVec3f(modelStates[0].volumes[i], "boundingBoxMax", &volumeBoundingBox.upper);
+      ospray::box3f volumeBoundingBox;
+      ospGetVec3f(modelStates[0].volumes[i], "boundingBoxMin", (osp::vec3f*)&volumeBoundingBox.lower);
+      ospGetVec3f(modelStates[0].volumes[i], "boundingBoxMax", (osp::vec3f*)&volumeBoundingBox.upper);
 
       boundingBox.extend(volumeBoundingBox);
     }
@@ -430,16 +561,23 @@ void VolumeViewer::initUserInterfaceWidgets()
   addDockWidget(Qt::LeftDockWidgetArea, isosurfaceEditorDockWidget);
 
   // Create the light editor dock widget, this widget modifies the light directly.
-  // Disable for now pending UI improvements...
-  /* QDockWidget *lightEditorDockWidget = new QDockWidget("Light Editor", this);
-     LightEditor *lightEditor = new LightEditor(light);
-     lightEditorDockWidget->setWidget(lightEditor);
-     connect(lightEditor, SIGNAL(lightChanged()), this, SLOT(render()));
-     addDockWidget(Qt::LeftDockWidgetArea, lightEditorDockWidget); */
+  QDockWidget *lightEditorDockWidget = new QDockWidget("Lights", this);
+  LightEditor *lightEditor = new LightEditor(ambientLight, directionalLight);
+  lightEditorDockWidget->setWidget(lightEditor);
+  connect(lightEditor, SIGNAL(lightsChanged()), this, SLOT(render()));
+  addDockWidget(Qt::LeftDockWidgetArea, lightEditorDockWidget);
+
+  // Create the probe dock widget.
+  QDockWidget *probeDockWidget = new QDockWidget("Probe", this);
+  probeWidget = new ProbeWidget(this);
+  probeDockWidget->setWidget(probeWidget);
+  addDockWidget(Qt::LeftDockWidgetArea, probeDockWidget);
 
   // Tabify dock widgets.
   tabifyDockWidget(transferFunctionEditorDockWidget, sliceEditorDockWidget);
   tabifyDockWidget(transferFunctionEditorDockWidget, isosurfaceEditorDockWidget);
+  tabifyDockWidget(transferFunctionEditorDockWidget, lightEditorDockWidget);
+  tabifyDockWidget(transferFunctionEditorDockWidget, probeDockWidget);
 
   // Tabs on top.
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);

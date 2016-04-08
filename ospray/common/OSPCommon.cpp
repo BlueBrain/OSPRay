@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -20,22 +20,35 @@
 #include "common/sys/sysinfo.h"
 // std
 #include <time.h>
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h> // for GetSystemTime
+#else
 #include <sys/time.h>
 #include <sys/times.h>
+#endif
 
 namespace ospray {
 
   /*! 64-bit malloc. allows for alloc'ing memory larger than 64 bits */
   extern "C" void *malloc64(size_t size)
   {
-    return malloc(size);
+    return embree::alignedMalloc(size);
+  }
+
+  /*! 64-bit malloc. allows for alloc'ing memory larger than 64 bits */
+  extern "C" void free64(void *ptr)
+  {
+    return embree::alignedFree(ptr);
   }
 
   /*! logging level - '0' means 'no logging at all', increasing
       numbers mean increasing verbosity of log messages */
   uint32 logLevel = 0;
   bool debugMode = false;
-  uint32 numThreads = 0; //!< 0 for default number of Embree threads.
+  int32 numThreads = -1; //!< for default (==maximum) number of OSPRay/Embree threads
 
   WarnOnce::WarnOnce(const std::string &s) 
     : s(s) 
@@ -67,25 +80,30 @@ namespace ospray {
 
   void doAssertion(const char *file, int line, const char *expr, const char *expl) {
     if (expl)
-      fprintf(stderr,"%s:%u: Assertion failed: \"%s\":\nAdditional Info: %s\n", 
+      fprintf(stderr,"%s:%i: Assertion failed: \"%s\":\nAdditional Info: %s\n", 
               file, line, expr, expl);
     else
-      fprintf(stderr,"%s:%u: Assertion failed: \"%s\".\n", file, line, expr);
+      fprintf(stderr,"%s:%i: Assertion failed: \"%s\".\n", file, line, expr);
     abort();
   }
 
   double getSysTime() {
+#ifdef _WIN32
+    SYSTEMTIME tp; GetSystemTime(&tp);
+    return double(tp.wSecond) + double(tp.wMilliseconds) / 1E3;
+#else
     struct timeval tp; gettimeofday(&tp,NULL); 
     return double(tp.tv_sec) + double(tp.tv_usec)/1E6; 
+#endif
   }
 
   void init(int *_ac, const char ***_av)
   {
-#if !OSPRAY_TARGET_MIC
-    // if we're not on a MIC, check for SSE4.2 as minimum supported ISA.
+#ifndef OSPRAY_TARGET_MIC
+    // If we're not on a MIC, check for SSE4.1 as minimum supported ISA. Will be increased to SSE4.2 in future.
     int cpuFeatures = embree::getCPUFeatures();
-    if ((cpuFeatures & embree::CPU_FEATURE_SSE42) == 0)
-      throw std::runtime_error("Error. OSPRay only runs on CPUs that support at least SSE4.2.");
+    if ((cpuFeatures & embree::CPU_FEATURE_SSE41) == 0)
+      throw std::runtime_error("Error. OSPRay only runs on CPUs that support at least SSE4.1.");
 #endif
 
     int &ac = *_ac;
@@ -104,7 +122,7 @@ namespace ospray {
       } else if (parm == "--osp:loglevel") {
         logLevel = atoi(av[i+1]);
         removeArgs(ac,av,i,2);
-      } else if (parm == "--osp:numthreads") {
+      } else if (parm == "--osp:numthreads" || parm == "--osp:num-threads") {
         numThreads = atoi(av[i+1]);
         removeArgs(ac,av,i,2);
       } else {
@@ -144,6 +162,7 @@ namespace ospray {
     switch (type) {
     case OSP_VOID_PTR:  return sizeof(void *);
     case OSP_OBJECT:    return sizeof(void *);
+    case OSP_DATA:      return sizeof(void *);
     case OSP_CHAR:      return sizeof(int8);
     case OSP_UCHAR:     return sizeof(uint8);
     case OSP_UCHAR2:    return sizeof(embree::Vec2<uint8>);
@@ -157,19 +176,20 @@ namespace ospray {
     case OSP_UINT2:     return sizeof(embree::Vec2<uint32>);
     case OSP_UINT3:     return sizeof(embree::Vec3<uint32>);
     case OSP_UINT4:     return sizeof(embree::Vec4<uint32>);
-    case OSP_LONG:       return sizeof(int64);
-    case OSP_LONG2:      return sizeof(embree::Vec2<int64>);
-    case OSP_LONG3:      return sizeof(embree::Vec3<int64>);
-    case OSP_LONG4:      return sizeof(embree::Vec4<int64>);
-    case OSP_ULONG:      return sizeof(uint64);
-    case OSP_ULONG2:     return sizeof(embree::Vec2<uint64>);
-    case OSP_ULONG3:     return sizeof(embree::Vec3<uint64>);
-    case OSP_ULONG4:     return sizeof(embree::Vec4<uint64>);
+    case OSP_LONG:      return sizeof(int64);
+    case OSP_LONG2:     return sizeof(embree::Vec2<int64>);
+    case OSP_LONG3:     return sizeof(embree::Vec3<int64>);
+    case OSP_LONG4:     return sizeof(embree::Vec4<int64>);
+    case OSP_ULONG:     return sizeof(uint64);
+    case OSP_ULONG2:    return sizeof(embree::Vec2<uint64>);
+    case OSP_ULONG3:    return sizeof(embree::Vec3<uint64>);
+    case OSP_ULONG4:    return sizeof(embree::Vec4<uint64>);
     case OSP_FLOAT:     return sizeof(float);
     case OSP_FLOAT2:    return sizeof(embree::Vec2<float>);
     case OSP_FLOAT3:    return sizeof(embree::Vec3<float>);
     case OSP_FLOAT4:    return sizeof(embree::Vec4<float>);
     case OSP_FLOAT3A:   return sizeof(embree::Vec3fa);
+    case OSP_DOUBLE:    return sizeof(double);
     default: break;
     };
 
@@ -183,6 +203,7 @@ namespace ospray {
 
     if (string == NULL)                return(OSP_UNKNOWN);
     if (strcmp(string, "char"  ) == 0) return(OSP_CHAR);
+    if (strcmp(string, "double") == 0) return(OSP_DOUBLE);
     if (strcmp(string, "float" ) == 0) return(OSP_FLOAT);
     if (strcmp(string, "float2") == 0) return(OSP_FLOAT2);
     if (strcmp(string, "float3") == 0) return(OSP_FLOAT2);

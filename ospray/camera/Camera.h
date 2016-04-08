@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -28,8 +28,17 @@ namespace ospray {
     //! \brief common function to help printf-debugging 
     /*! Every derived class should overrride this! */
     virtual std::string toString() const { return "ospray::Camera (base class)"; }
+    virtual void commit();
     static Camera *createCamera(const char *identifier);
-    virtual void initRay(Ray &ray, const vec2f &sample) = 0;
+
+  public:
+    // ------------------------------------------------------------------
+    // parameters that each camera has, 'parsed' from params
+    // ------------------------------------------------------------------
+    vec3f  pos;      // position of the camera in world-space
+    vec3f  dir;      // main direction of the camera in world-space
+    vec3f  up;       // up direction of the camera in world-space
+    float  nearClip; // near clipping distance
   };
 
   /*! \brief registers a internal ospray::'ClassName' camera under
@@ -42,7 +51,7 @@ namespace ospray {
       of this camera.
   */
 #define OSP_REGISTER_CAMERA(InternalClassName,external_name)        \
-  extern "C" Camera *ospray_create_camera__##external_name()        \
+  extern "C" OSPRAY_INTERFACE Camera *ospray_create_camera__##external_name()        \
   {                                                                 \
     return new InternalClassName;                                   \
   }                                                                 \

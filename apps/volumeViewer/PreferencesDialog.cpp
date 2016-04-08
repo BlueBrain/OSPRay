@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -14,15 +14,20 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
-#include "PreferencesDialog.h"
 #include "VolumeViewer.h"
+#include "PreferencesDialog.h"
 
-PreferencesDialog::PreferencesDialog(VolumeViewer *volumeViewer, osp::box3f boundingBox) : QDialog(volumeViewer), volumeViewer(volumeViewer)
+PreferencesDialog::PreferencesDialog(VolumeViewer *volumeViewer, ospray::box3f boundingBox) : QDialog(volumeViewer), volumeViewer(volumeViewer)
 {
   setWindowTitle("Preferences");
 
   QFormLayout *formLayout = new QFormLayout();
   setLayout(formLayout);
+
+  // render annotations flag
+  QCheckBox *renderAnnotationsEnabledCheckBox = new QCheckBox();
+  connect(renderAnnotationsEnabledCheckBox, SIGNAL(toggled(bool)), volumeViewer, SLOT(setRenderAnnotationsEnabled(bool)));
+  formLayout->addRow("Render annotations", renderAnnotationsEnabledCheckBox);
 
   // subsampling during interaction flag
   QCheckBox *subsamplingInteractionEnabledCheckBox = new QCheckBox();
@@ -32,7 +37,7 @@ PreferencesDialog::PreferencesDialog(VolumeViewer *volumeViewer, osp::box3f boun
   // gradient shading flag
   QCheckBox *gradientShadingEnabledCheckBox = new QCheckBox();
   connect(gradientShadingEnabledCheckBox, SIGNAL(toggled(bool)), volumeViewer, SLOT(setGradientShadingEnabled(bool)));
-  formLayout->addRow("Volume gradient shading", gradientShadingEnabledCheckBox);
+  formLayout->addRow("Volume gradient shading (lighting)", gradientShadingEnabledCheckBox);
 
   // sampling rate selection
   QDoubleSpinBox *samplingRateSpinBox = new QDoubleSpinBox();
@@ -86,8 +91,12 @@ PreferencesDialog::PreferencesDialog(VolumeViewer *volumeViewer, osp::box3f boun
 
 void PreferencesDialog::updateVolumeClippingBox()
 {
-  osp::vec3f lower(volumeClippingBoxSpinBoxes[0]->value(), volumeClippingBoxSpinBoxes[1]->value(), volumeClippingBoxSpinBoxes[2]->value());
-  osp::vec3f upper(volumeClippingBoxSpinBoxes[3]->value(), volumeClippingBoxSpinBoxes[4]->value(), volumeClippingBoxSpinBoxes[5]->value());
+  ospray::vec3f lower(volumeClippingBoxSpinBoxes[0]->value(), 
+                      volumeClippingBoxSpinBoxes[1]->value(), 
+                      volumeClippingBoxSpinBoxes[2]->value());
+  ospray::vec3f upper(volumeClippingBoxSpinBoxes[3]->value(), 
+                      volumeClippingBoxSpinBoxes[4]->value(), 
+                      volumeClippingBoxSpinBoxes[5]->value());
 
-  volumeViewer->setVolumeClippingBox(osp::box3f(lower, upper));
+  volumeViewer->setVolumeClippingBox(ospray::box3f(lower, upper));
 }

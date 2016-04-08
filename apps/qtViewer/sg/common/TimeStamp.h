@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -29,7 +29,7 @@ namespace ospray {
       TimeStamp(uint64 t) : t(t) {};
       
       //! \brief returns global time(stamp) at time of calling
-      static inline TimeStamp now() { return __rdtsc(); }
+      static inline TimeStamp now() { return ospray::rdtsc(); }
 
       //! \brief Allows ot typecast to a uint64 (so times can be compared)
       inline operator uint64 () const { return t; }

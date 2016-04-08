@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,23 +19,86 @@
 /*! \file OSPCommon.h Defines common types and classes that _every_
   ospray file should know about */
 
+// include cmake config first
+#include "OSPConfig.h"
+
+#ifdef _WIN32
+  typedef unsigned long long id_t;
+#endif
+
+#if defined(__WIN32__) || defined(_WIN32)
+// ----------- windows only -----------
+# define _USE_MATH_DEFINES 1
+# include <cmath>
+# include <math.h>
+# ifdef _M_X64
+typedef long long ssize_t;
+# else
+typedef int ssize_t;
+# endif
+#else
+// ----------- NOT windows -----------
+# include "unistd.h"
+#endif
+
 // embree
 #include "common/math/vec2.h"
 #include "common/math/vec3.h"
 #include "common/math/vec4.h"
 #include "common/math/bbox.h"
-#include "common/math/affinespace.h"
+#include "common/math/affinespace.h" // includes "common/math/linearspace[23].h"
 #include "common/sys/ref.h"
-#include "common/sys/taskscheduler.h"
+#include "common/sys/alloc.h"
+
+// C++11
+#include <vector>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+
+#if 1
+// iw: remove this eventually, and replace all occurrences with actual
+// std::atomic_xyz's etc; for now this'll make it easier to try out the new c++11 types
+namespace ospray {
+  typedef std::atomic_int AtomicInt;
+  typedef std::mutex Mutex;
+  typedef std::lock_guard<std::mutex> LockGuard;
+  typedef std::condition_variable Condition;
+
+}
+
+#define SCOPED_LOCK(x) \
+  ospray::LockGuard lock(x); \
+  (void)lock;
+#endif
 
 // ospray
 #include "ospray/common/OSPDataType.h"
 
 // std
 #include <stdint.h> // for int64_t etc
+#include <sstream>
+
+#ifdef _WIN32
+#  ifdef ospray_EXPORTS
+#    define OSPRAY_INTERFACE __declspec(dllexport)
+#  else
+#    define OSPRAY_INTERFACE __declspec(dllimport)
+#  endif
+#else
+#  define OSPRAY_INTERFACE
+#endif
 
 
-#ifdef OSPRAY_TARGET_MIC
+// for MIC, disable the 'variable declared bbut never referenced'
+// warning, else the ISPC-generated code produces _far_ too many such
+// outputs
+#if defined(__INTEL_COMPILER) && defined(__MIC__)
+#pragma warning(disable:177 ) // variable declared but was never referenced
+#endif
+
+#if 0//NOTE: this causes crashes in standard library containers on MIC...
+//#ifdef OSPRAY_TARGET_MIC
 inline void* operator new(size_t size) throw(std::bad_alloc) { return embree::alignedMalloc(size); }       
 inline void operator delete(void* ptr) throw() { embree::alignedFree(ptr); }      
 inline void* operator new[](size_t size) throw(std::bad_alloc) { return embree::alignedMalloc(size); }  
@@ -49,6 +112,11 @@ namespace ospray {
   using embree::empty;
   using embree::zero;
   using embree::inf;
+  using embree::deg2rad;
+  using embree::rad2deg;
+  using embree::sign;
+  using embree::clamp;
+  using embree::frac;
 
   /*! basic types */
   typedef ::int64_t int64;
@@ -69,6 +137,8 @@ namespace ospray {
   typedef embree::Vec2i    vec2i;
   /*! OSPRay's three-unsigned char vector class */
   typedef embree::Vec3<uint8> vec3uc;
+  /*! OSPRay's 4x unsigned char vector class */
+  typedef embree::Vec4<uint8> vec4uc;
   /*! OSPRay's 2x uint32 vector class */
   typedef embree::Vec2<uint32> vec2ui;
   /*! OSPRay's 3x uint32 vector class */
@@ -91,6 +161,9 @@ namespace ospray {
   typedef embree::BBox<vec2ui>   box2ui;
   typedef embree::BBox<vec2i>    region2i;
   typedef embree::BBox<vec2ui>   region2ui;
+
+  typedef embree::BBox<vec3i>    box3i;
+  typedef embree::BBox<vec3ui>   box3ui;
   
   typedef embree::BBox3f         box3f;
   typedef embree::BBox3fa        box3fa;
@@ -99,11 +172,13 @@ namespace ospray {
   typedef embree::BBox3fa        box3fa;
   
   /*! affice space transformation */
+  typedef embree::AffineSpace2f  affine2f;
   typedef embree::AffineSpace3f  affine3f;
   typedef embree::AffineSpace3fa affine3fa;
   typedef embree::AffineSpace3f  AffineSpace3f;
   typedef embree::AffineSpace3fa AffineSpace3fa;
 
+  typedef embree::LinearSpace2f  linear2f;
   typedef embree::LinearSpace3f  linear3f;
   typedef embree::LinearSpace3fa linear3fa;
   typedef embree::LinearSpace3f  LinearSpace3f;
@@ -112,22 +187,25 @@ namespace ospray {
   using   embree::Ref;
   using   embree::RefCount;
 
+  using embree::cross;
+  using embree::volume;
+
   /*! return system time in seconds */
-  double getSysTime();
+  OSPRAY_INTERFACE double getSysTime();
 
   void init(int *ac, const char ***av);
 
   /*! remove specified num arguments from an ac/av arglist */
-  void removeArgs(int &ac, char **&av, int where, int howMany);
+  OSPRAY_INTERFACE void removeArgs(int &ac, char **&av, int where, int howMany);
   /*! for debugging. compute a checksum for given area range... */
-  void *computeCheckSum(const void *ptr, size_t numBytes);
+  OSPRAY_INTERFACE void *computeCheckSum(const void *ptr, size_t numBytes);
 
+  OSPRAY_INTERFACE void doAssertion(const char *file, int line, const char *expr, const char *expl);
 #ifdef NDEBUG
 # define Assert(expr) /* nothing */
 # define Assert2(expr,expl) /* nothing */
 # define AssertError(errMsg) /* nothing */
 #else
-  extern void doAssertion(const char *file, int line, const char *expr, const char *expl);
 # define Assert(expr)                                                   \
   ((void)((expr) ? 0 : ((void)ospray::doAssertion(__FILE__, __LINE__, #expr, NULL), 0)))
 # define Assert2(expr,expl)                                             \
@@ -136,21 +214,21 @@ namespace ospray {
   doAssertion(__FILE__,__LINE__, (errMsg), NULL)
 #endif
 
+  inline size_t rdtsc() { return embree::rdtsc(); }
+
   /*! logging level (cmdline: --osp:loglevel \<n\>) */
   extern uint32 logLevel;
   /*! whether we're running in debug mode (cmdline: --osp:debug) */
   extern bool debugMode;
-  /*! number of Embree threads to use, 0 for the default number. (cmdline: --osp:numthreads \<n\>) */
-  extern uint32 numThreads;
-
-  /*! error handling callback to be used by embree */
-  //  void error_handler(const RTCError code, const char *str);
+  /*! number of Embree threads to use, 0 for the default
+      number. (cmdline: --osp:numthreads \<n\>) */
+  extern int32 numThreads;
 
   /*! size of OSPDataType */
-  size_t sizeOf(OSPDataType type);
+  OSPRAY_INTERFACE size_t sizeOf(OSPDataType type);
 
   /*! Convert a type string to an OSPDataType. */
-  OSPDataType typeForString(const char *string);
+  OSPRAY_INTERFACE OSPDataType typeForString(const char *string);
 
   struct WarnOnce {
     WarnOnce(const std::string &s);
@@ -175,10 +253,16 @@ namespace ospray {
     }
     return result;
   }
+
 } // ::ospray
 
+#ifdef _WIN32
+#define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
 #define NOTIMPLEMENTED    throw std::runtime_error(std::string(__PRETTY_FUNCTION__)+": not implemented...");
 
-#define divRoundUp(X,Y) (((X)+(Y)-1)/(Y))
+template <typename T>
+inline T divRoundUp(const T&a, const T&b) { return (a+(b-T(1)))/b; }
+
   
 

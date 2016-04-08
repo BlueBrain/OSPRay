@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -47,6 +47,15 @@ namespace ospray {
     }
     Camera *camera = (*creator)();  camera->managedObjectType = OSP_CAMERA;
     return(camera);
+  }
+
+  void Camera::commit()
+  {
+    // "parse" the general expected parameters
+    pos      = getParam3f("pos", vec3f(0.f));
+    dir      = getParam3f("dir", vec3f(0.f, 0.f, 1.f));
+    up       = getParam3f("up", vec3f(0.f, 1.f, 0.f));
+    nearClip = getParam1f("near_clip", getParam1f("nearClip", 1e-6f));
   }
 
 } // ::ospray

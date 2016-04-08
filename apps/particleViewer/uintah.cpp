@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -340,6 +340,7 @@ namespace ospray {
     Model *parse__Uintah_timestep_xml(const std::string &s)
     {
       Model *model = new Model;
+      Model::defaultRadius = .002f;
       xml::XMLDoc *doc = xml::readXML(s);
 
       char *dumpFileName = getenv("OSPRAY_PARTICLE_DUMP_FILE");
@@ -365,7 +366,6 @@ namespace ospray {
         bounds.extend(model->atom[i].position);
       }
       std::cout << "#osp:mpm: bounds of particle centers: " << bounds << std::endl;
-      model->radius = .002f;
       delete doc;
       return model;
     }

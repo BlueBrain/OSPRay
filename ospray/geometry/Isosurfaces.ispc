@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -90,6 +90,7 @@ void Isosurfaces_intersect(uniform Isosurfaces *uniform self,
       if (tHit <= rayCopy.t) {
         ray.geomID = self->geometry.geomID;
         ray.primID = isovalueID;
+        ray.instID = -1;
         ray.t = tHit;
         return;
       }
@@ -108,11 +109,16 @@ static void Isosurfaces_postIntersect(uniform Geometry *uniform geometry,
 {
   uniform Isosurfaces *uniform self = (uniform Isosurfaces *uniform)geometry;
 
-  if ((flags & DG_NS))
+  if ((flags & DG_NS)) {
     dg.Ns = self->volume->computeGradient(self->volume, dg.P);
+    if (dot(dg.Ns,dg.Ns) < 1e-6f)
+      dg.Ns = neg(ray.dir); //make_vec3f(1.f,0.f,0.f);
+  }
+
 
   if ((flags & DG_COLOR)) {
-    const vec3f sampleColor = self->volume->transferFunction->getColorForValue(self->volume->transferFunction, self->isovalues[ray.primID]);
+    TransferFunction *uniform xf = self->volume->transferFunction;
+    const vec3f sampleColor = xf->getColorForValue(xf, self->isovalues[ray.primID]);
     const float sampleOpacity = 1.f; // later allow "opacity" parameter on isosurfaces.
     dg.color = make_vec4f(sampleColor.x, sampleColor.y, sampleColor.z, sampleOpacity);
   }

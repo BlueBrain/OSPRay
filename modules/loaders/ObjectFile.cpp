@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -31,9 +31,10 @@ OSPObject *ObjectFile::importObjects(const std::string &filename)
 
   // The subtype string is the file extension.
   std::string type = filename.substr(filename.find_last_of(".") + 1);
-
+  
   // Return a concrete instance of the requested subtype if the creation function is already known.
-  if (symbolRegistry.count(type) > 0 && symbolRegistry[type] != NULL) return((*symbolRegistry[type])(fullfilename));
+  if (symbolRegistry.count(type) > 0 && symbolRegistry[type] != NULL) 
+    return((*symbolRegistry[type])(fullfilename));
 
   // Otherwise construct the name of the creation function to look for.
   std::string creationFunctionName = "ospray_import_object_file_" + std::string(type);

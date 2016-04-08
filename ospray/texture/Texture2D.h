@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,9 +23,12 @@ namespace ospray {
 
   /*! \brief A Texture defined through a 2D Image. */
   struct Texture2D : public Texture {
+
     //! \brief common function to help printf-debugging 
     /*! Every derived class should overrride this! */
     virtual std::string toString() const { return "ospray::Texture2D"; }
+
+    virtual ~Texture2D();
 
     /*! \brief creates a Texture2D object with the given parameter */
     static Texture2D *createTexture(int width, int height, OSPDataType type, 
@@ -35,6 +38,7 @@ namespace ospray {
     int height;
     OSPDataType type;
     void *data;
+    int flags;
   };
 
 } // ::ospray

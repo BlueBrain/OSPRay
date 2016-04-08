@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include "MPICommon.h"
-#include "../render/LoadBalancer.h"
+#include "ospray/mpi/MPICommon.h"
+#include "ospray/render/LoadBalancer.h"
 
 namespace ospray {
   namespace mpi {
-    
+
     // =======================================================
     // =======================================================
     // =======================================================
@@ -35,12 +35,10 @@ namespace ospray {
       */
       struct Master : public TiledLoadBalancer
       {
-        Master();
-        
-        virtual void renderFrame(Renderer *tiledRenderer,
-                                 FrameBuffer *fb,
-                                 const uint32 channelFlags);
-        virtual std::string toString() const { return "ospray::mpi::staticLoadBalancer::Master"; };
+        void renderFrame(Renderer *tiledRenderer,
+                         FrameBuffer *fb,
+                         const uint32 channelFlags);
+        std::string toString() const;
       };
 
       /*! \brief the 'slave' in a tile-based master-slave *static*
@@ -52,36 +50,17 @@ namespace ospray {
       */
       struct Slave : public TiledLoadBalancer
       {
-        Slave();
-        
-        /*! a task for rendering a frame using the global tiled load balancer */
-        struct RenderTask : public embree::RefCount {
-          Ref<Renderer>                renderer;
-          Ref<FrameBuffer>             fb;
-          size_t                       numTiles_x;
-          size_t                       numTiles_y;
-          //          vec2i                        fbSize;
-          uint32                       channelFlags;
-          embree::TaskScheduler::Task  task;
-          
-          TASK_RUN_FUNCTION(RenderTask,run);
-          TASK_COMPLETE_FUNCTION(RenderTask,finish);
-          
-          virtual ~RenderTask() {}
-        };
-        
         /*! number of tiles preallocated to this client; we can always
           render those even without asking for them. */
-        uint32 numPreAllocated; 
+        uint32 numPreAllocated;
         /*! total number of worker threads across all(!) slaves */
         int32 numTotalThreads;
-        
-        virtual void renderFrame(Renderer *tiledRenderer, 
-                                 FrameBuffer *fb,
-                                 const uint32 channelFlags);
-        virtual std::string toString() const { return "ospray::mpi::staticLoadBalancer::Slave"; };
-      };
-    }
 
+        void renderFrame(Renderer *tiledRenderer,
+                         FrameBuffer *fb,
+                         const uint32 channelFlags);
+        std::string toString() const;
+      };
+    }// ::ospray::mpi::staticLoadBalancer
   } // ::ospray::mpi
 } // ::ospray

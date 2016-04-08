@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -34,16 +34,17 @@ namespace ospray {
   {
     managedObjectType = OSP_MODEL;
     this->ispcEquivalent = ispc::Model_create(this);
+    this->embreeSceneHandle = NULL;
   }
   void Model::finalize()
   {
     if (logLevel >= 2) {
       std::cout << "=======================================================" << std::endl;
       std::cout << "Finalizing model, has " 
-           << geometry.size() << " geometries and " << volumes.size() << " volumes" << std::endl << std::flush;
+           << geometry.size() << " geometries and " << volume.size() << " volumes" << std::endl << std::flush;
     }
 
-    ispc::Model_init(getIE(), geometry.size(), volumes.size());
+    ispc::Model_init(getIE(), geometry.size(), volume.size());
     embreeSceneHandle = (RTCScene)ispc::Model_getEmbreeSceneHandle(getIE());
 
     bounds = embree::empty;
@@ -61,8 +62,12 @@ namespace ospray {
       bounds.extend(geometry[i]->bounds);
       ispc::Model_setGeometry(getIE(), i, geometry[i]->getIE());
     }
+    if (geometry.size() > 10) {
+      PING; PRINT(geometry.size());
+    }
 
-    for (size_t i=0 ; i < volumes.size() ; i++) ispc::Model_setVolume(getIE(), i, volumes[i]->getIE());
+    for (size_t i=0; i<volume.size(); i++) 
+      ispc::Model_setVolume(getIE(), i, volume[i]->getIE());
     
     rtcCommit(embreeSceneHandle);
   }

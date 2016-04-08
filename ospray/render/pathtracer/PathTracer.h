@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,18 +17,17 @@
 #pragma once
 
 #include "ospray/render/Renderer.h"
-#include "ospray/common/Model.h"
-#include "ospray/camera/Camera.h"
+#include "ospray/common/Material.h"
 
 namespace ospray {
   struct PathTracer : public Renderer {
-    virtual std::string toString() const
-    { return "ospray::PathTracer"; }
-
     PathTracer();
+    virtual std::string toString() const { return "ospray::PathTracer"; }
     virtual void commit();
-    /*! \brief create a material of given type */
     virtual Material *createMaterial(const char *type);
+
+    std::vector<void*> lightArray; // the 'IE's of the XXXLights
+    Data *lightData;
   };
 }
 

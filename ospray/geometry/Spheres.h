@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -69,12 +69,15 @@ namespace ospray {
     int64 offset_center;
     int64 offset_radius;
     int64 offset_materialID;
+    int64 offset_colorID;
 
-    Ref<Data> data;
+    Ref<Data> sphereData;
     Ref<Data> materialList;
     void     *_materialList;
+    Ref<Data> colorData; /*!< sphere color array (vec3fa) */
 
     Spheres();
+    ~Spheres();
   };
   /*! @} */
 

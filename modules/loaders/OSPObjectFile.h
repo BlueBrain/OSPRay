@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,8 +16,11 @@
 
 #pragma once
 
+#include "modules/loaders/RawVolumeFile.h"
 #include "modules/loaders/ObjectFile.h"
 #include "modules/loaders/TinyXML2.h"
+// stl
+#include <map>
 
 //! \brief A concrete implementation of the ObjectFile class
 //!  for loading collections of OSPRay objects stored in XML format.
@@ -72,10 +75,10 @@ private:
   OSPLight importLight(const tinyxml2::XMLNode *root);
 
   //! Import a triangle mesh object.
-  OSPTriangleMesh importTriangleMesh(const tinyxml2::XMLNode *root);
+  OSPGeometry importTriangleMesh(const tinyxml2::XMLNode *root);
 
   //! Import a volume object.
   OSPVolume importVolume(const tinyxml2::XMLNode *root);
-
+  
 };
 

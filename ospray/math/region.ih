@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,14 @@
 #pragma once
 
 #include "vec.ih"
+
+struct region1f {
+  float lower;
+  float upper;
+};
+
+inline region1f make_region1f(const float lower, const float upper) 
+{ region1f ret; ret.lower = lower; ret.upper = upper; return ret; }
 
 struct region2i {
   vec2i lower;

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -139,6 +139,7 @@ void StreamLines_intersect(uniform StreamLines *uniform geometry,
   if (hit) {
     ray.geomID = geometry->geometry.geomID;
     ray.primID = primID; // original primID needed for vertex coloring
+    ray.instID = -1;
     const vec3f P = ray.t * ray.dir;
     float s = dot(P-A,B-A) * rcpf(dot(B-A,B-A));
     s = min(max(s,0.f),1.f);

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,7 +23,7 @@
 // viewer
 #include "ModelViewer.h"
 // embree
-#include "ospray/embree/common/sys/filename.h"
+#include "common/sys/filename.h"
 // scene graph
 #include "sg/module/Module.h"
 #include "sg/importer/Importer.h"
@@ -84,6 +84,8 @@ namespace ospray {
             frameResolution.y = atoi(argv[++argID]);
           } else if (arg == "-spp" || arg == "--spp" || arg == "--samples-per-pixel") {
             spp = atoi(argv[++argID]);
+          } else if (arg == "--data-distributed" || arg == "--data-parallel") {
+            sg::Volume::useDataDistributedVolume = true;
           } else if (arg == "--1k" || arg == "-1k") {
             frameResolution.x = 1024;
             frameResolution.y = 1024;
@@ -127,7 +129,8 @@ namespace ospray {
             world = sg::loadOSP(fn.str());
             // } else if (fn.ext() == "atom") {
             //   world = sg::AlphaSpheres::importOspAtomFile(fn.str());
-          } else if (fn.ext() == "ply") {
+          } else if ((fn.ext() == "ply") || 
+                     ((fn.ext() == "gz") && (fn.dropExt().ext() == "ply"))) {
             sg::importPLY(world,fn);
           } else if (fn.ext() == "obj") {
             sg::importOBJ(world,fn);

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,7 +26,7 @@ struct Phong {
   float size;
 };
 
-struct Texture {
+struct TachyonTexture {
   float ambient, diffuse, specular, opacity;
   Phong phong;
   vec3f color;
@@ -49,9 +49,9 @@ struct DirLight
 };
 
 struct TachyonRenderer {
-  Renderer inherited;
+  Renderer super;
 
-  uniform Texture    *textureArray;
+  uniform TachyonTexture *textureArray;
   uniform PointLight *pointLight;
   uint32  numPointLights;
   uniform DirLight   *dirLight;
@@ -73,12 +73,12 @@ inline float lightAlpha(Ray &ray, uniform TachyonRenderer *uniform tachyon, cons
   int max_depth = 8; // max number of rays to be traced...
   float org_t_max = ray.t;
   while (1) {
-    traceRay(tachyon->inherited.model,ray);
+    traceRay(tachyon->super.model,ray);
     if (ray.geomID < 0) 
       return alpha;
     
     DifferentialGeometry dg;
-    postIntersect(tachyon->inherited.model,dg,ray,
+    postIntersect(tachyon->super.model,dg,ray,
                   DG_MATERIALID
                   );
     const float material_opacity = tachyon->textureArray[dg.materialID].opacity;
@@ -105,7 +105,7 @@ inline vec3f shade(Ray &ray, uniform TachyonRenderer *uniform tachyon)
   int max_depth = 10; // max number of rays to be traced...
   uniform int depth = 0;
   while (1) {
-    traceRay(tachyon->inherited.model,ray);
+    traceRay(tachyon->super.model,ray);
     if (ray.geomID < 0) {
       vec3f bgColor = make_vec3f(1.f);
       // if (depth == 0)
@@ -118,7 +118,7 @@ inline vec3f shade(Ray &ray, uniform TachyonRenderer *uniform tachyon)
 
     vec3f localShadeColor = make_vec3f(0.f);
     DifferentialGeometry dg;
-    postIntersect(tachyon->inherited.model,dg,ray,
+    postIntersect(tachyon->super.model,dg,ray,
                   DG_NG|DG_NS|DG_NORMALIZE|DG_FACEFORWARD
                   |DG_MATERIALID|DG_COLOR
                   );
@@ -128,7 +128,7 @@ inline vec3f shade(Ray &ray, uniform TachyonRenderer *uniform tachyon)
     if (local_opacity > .01f) {
       // enough weight here to shade at all ...
 
-      Texture texture = tachyon->textureArray[dg.materialID];
+      TachyonTexture texture = tachyon->textureArray[dg.materialID];
       if (dg.color.x >= 0.f)
         texture.color = texture.color * make_vec3f(dg.color);
 
@@ -224,6 +224,7 @@ inline vec3f shade(Ray &ray, uniform TachyonRenderer *uniform tachyon)
 }
 
 void TachyonRenderer_renderSample(uniform Renderer *uniform _renderer,
+                                  void *uniform perFrameData,
                                   varying ScreenSample &sample)
 {
   uniform TachyonRenderer *uniform renderer = (uniform TachyonRenderer *uniform)_renderer;
@@ -233,8 +234,8 @@ void TachyonRenderer_renderSample(uniform Renderer *uniform _renderer,
 export void *uniform TachyonRenderer_create(void *uniform cppE)
 {
   uniform TachyonRenderer *uniform renderer = uniform new uniform TachyonRenderer;
-  Renderer_Constructor(&renderer->inherited,cppE);
-  renderer->inherited.renderSample = TachyonRenderer_renderSample;
+  Renderer_Constructor(&renderer->super,cppE);
+  renderer->super.renderSample = TachyonRenderer_renderSample;
   return renderer;
 }
 
@@ -250,10 +251,10 @@ export void TachyonRenderer_set(void *uniform _renderer,
                                 uniform float  lightScale)
 {
   uniform TachyonRenderer *uniform renderer = (uniform TachyonRenderer *uniform)_renderer;
-  renderer->inherited.model  = (uniform Model *uniform)_model;
-  renderer->inherited.camera = (uniform Camera *uniform)_camera;
+  renderer->super.model  = (uniform Model *uniform)_model;
+  renderer->super.camera = (uniform Camera *uniform)_camera;
 
-  renderer->textureArray = (uniform Texture *uniform)_textureArray;
+  renderer->textureArray = (uniform TachyonTexture *uniform)_textureArray;
   renderer->numPointLights = numPointLights;
   renderer->pointLight = (uniform PointLight *uniform)_pointLight;
   renderer->numDirLights = numDirLights;

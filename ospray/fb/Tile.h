@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,7 +17,7 @@
 #pragma once
 
 #include "ospray/common/OSPCommon.h"
-#include "tileSize.h"
+#include "ospray/render/util.h"
 
 namespace ospray {
 
@@ -48,6 +48,8 @@ namespace ospray {
     region2i region; /*!< screen region that this corresponds to */
     vec2i    fbSize; /*!< total frame buffer size, for the camera */
     vec2f    rcp_fbSize;
+    int32    generation;
+    int32    children;
   };
 
 } // ::ospray

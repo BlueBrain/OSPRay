@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,7 +18,8 @@
 
 // ospray 
 #include "OSPCommon.h"
-#include "ospray/include/ospray/ospray.h"
+#include "ospray/ospray.h"
+#include "ospray/common/ObjectHandle.h"
 // stl 
 #include <vector>
 #include <set>
@@ -186,6 +187,10 @@ namespace ospray {
     /*! \brief find a given parameter, or add it if not exists (and so specified) */
     Param *findParam(const char *name, bool addIfNotExist = false);
 
+    /*! \brief check if a given parameter is available */
+    bool hasParam(const char *name) 
+    { return findParam(name,false) != NULL; }
+
     /*! \brief set given parameter to given data array */
     void   setParam(const char *name, ManagedObject *data);
 
@@ -206,6 +211,7 @@ namespace ospray {
     Data *getParamData(const char *name, Data *valIfNotFound=NULL)
     { return (Data*)getParamObject(name,(ManagedObject*)valIfNotFound); }
 
+    vec4f  getParam4f(const char *name, const vec4f  valIfNotFound);
     vec3fa getParam3f(const char *name, const vec3fa valIfNotFound);
     vec3f  getParam3f(const char *name, const vec3f  valIfNotFound);
     vec3i  getParam3i(const char *name, const vec3i  valIfNotFound);

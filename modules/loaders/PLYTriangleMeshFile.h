@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "ospray/common/OSPCommon.h"
 #include <string>
 #include "modules/loaders/TriangleMeshFile.h"
 
@@ -26,16 +27,16 @@ class PLYTriangleMeshFile : public TriangleMeshFile {
 public:
 
   //! Constructor.
-  PLYTriangleMeshFile(const std::string &filename) : filename(filename), scale(osp::vec3f(1.f)), verbose(true) {}
+  PLYTriangleMeshFile(const std::string &filename);
 
   //! Destructor.
-  virtual ~PLYTriangleMeshFile() {};
+  virtual ~PLYTriangleMeshFile() {}
 
   //! Import the triangle data.
-  virtual OSPTriangleMesh importTriangleMesh(OSPTriangleMesh triangleMesh);
+  virtual OSPGeometry importTriangleMesh(OSPGeometry triangleMesh);
 
   //! A string description of this class.
-  virtual std::string toString() const { return("ospray_module_loaders::PLYTriangleMeshFile"); }
+  virtual std::string toString() const;
 
 private:
 
@@ -43,22 +44,22 @@ private:
   std::string filename;
 
   //! Scaling for vertex coordinates.
-  osp::vec3f scale;
+  ospray::vec3f scale;
 
   //! Verbose logging.
   bool verbose;
 
   //! Vertices.
-  std::vector<osp::vec3fa> vertices;
+  std::vector<ospray::vec3fa> vertices;
 
   //! Vertex colors.
-  std::vector<osp::vec3fa> vertexColors;
+  std::vector<ospray::vec4f> vertexColors;
 
   //! Vertex normals.
-  std::vector<osp::vec3fa> vertexNormals;
+  std::vector<ospray::vec3fa> vertexNormals;
 
   //! Triangle definitions.
-  std::vector<osp::vec3i>  triangles;
+  std::vector<ospray::vec3i>  triangles;
 
   //! Parse the file, determining the vertices, vertex colors, and triangles.
   bool parse();

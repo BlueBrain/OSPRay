@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -41,7 +41,7 @@ namespace ospray {
       ospray::loadLibrary(libName);
       void *sym = ospray::getSymbol(symName);
       if (!sym)
-        throw sg::RuntimeError("could not load module '"+moduleName+"'");
+        throw sg::RuntimeError("could not load module '"+moduleName+"' (symbol '"+symName+"' not found)");
 
       void (*initFct)() = (void (*)())sym;
       initFct();

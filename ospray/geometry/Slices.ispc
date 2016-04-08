@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -54,6 +54,7 @@ void Slices_intersect(uniform Slices *uniform slices,
       !isnan(slices->volume->computeSample(slices->volume, ray.org + tIntersect*ray.dir))) {
     ray.geomID = slices->geometry.geomID;
     ray.primID = primID;
+    ray.instID = -1;
     ray.t = tIntersect;
     ray.Ng = make_vec3f(slices->planes[primID]);
   }

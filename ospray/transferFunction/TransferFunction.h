@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -28,7 +28,7 @@
 //!  module and registered with OSPRay using this macro.
 //!
 #define OSP_REGISTER_TRANSFER_FUNCTION(InternalClass, ExternalName)     \
-  extern "C" TransferFunction *ospray_create_transfer_function_##ExternalName() \
+  extern "C" OSPRAY_INTERFACE TransferFunction *ospray_create_transfer_function_##ExternalName() \
   { return(new InternalClass()); }
 
 namespace ospray {

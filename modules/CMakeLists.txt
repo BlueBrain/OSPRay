@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2016 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -14,10 +14,11 @@
 ## limitations under the License.                                           ##
 ## ======================================================================== ##
 
+IF (NOT WIN32) # not yet...
 FILE(GLOB plugins RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/ *)
 FOREACH(plugin ${plugins})
   IF (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${plugin}/CMakeLists.txt)
     ADD_SUBDIRECTORY(${plugin})
   ENDIF (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${plugin}/CMakeLists.txt)
 ENDFOREACH(plugin ${plugins})
-
+ENDIF()

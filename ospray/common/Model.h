@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -46,14 +46,23 @@ namespace ospray {
     virtual void finalize();
 
     typedef std::vector<Ref<Geometry> > GeometryVector;
+    typedef std::vector<Ref<Volume> > VolumeVector;
+    
+    //! \brief vector of all geometries used in this model
     GeometryVector geometry;
+    //! \brief vector of all volumes used in this model
+    VolumeVector volume;
 
-    std::vector<Ref<Volume> > volumes;
-
-    box3f bounds;
+// #if EXP_DATA_PARALLEL
+//     /*! list of all pieces of data parallel volumes, including those
+//         that we do NOT own. note that some of these pieces may be
+//         owned by multiple owners */
+//     std::vector<Ref<Volume::DataParallelPiece> > dpVolumePieces;
+// #endif
 
     //! \brief the embree scene handle for this geometry
     RTCScene embreeSceneHandle; 
+    box3f bounds;
   };
 
 } // ::ospray

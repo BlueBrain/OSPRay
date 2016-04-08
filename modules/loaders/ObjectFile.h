@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -76,7 +76,14 @@ protected:
 
   //! Get the absolute file path.
   static std::string getFullFilePath(const std::string &filename)
-    { char *fullpath = realpath(filename.c_str(), NULL);  return(fullpath != NULL ? fullpath : filename); }
+  { 
+#ifdef _WIN32
+    //getfullpathname
+    throw std::runtime_error("no realpath() under windows");
+#else
+    char *fullpath = realpath(filename.c_str(), NULL);  return(fullpath != NULL ? fullpath : filename); 
+#endif
+  }
 
 };
 

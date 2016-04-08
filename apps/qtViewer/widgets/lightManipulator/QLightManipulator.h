@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -54,8 +54,8 @@ namespace ospray {
     // ==================================================================
     struct LightInfo {
       OSPLight ospLight;
-      osp::vec3f color;
-      osp::vec3f direction;
+      ospray::vec3f color;
+      ospray::vec3f direction;
       float intensity;
     };
 
@@ -102,7 +102,7 @@ namespace ospray {
       QPushButton *applyButton;
 
     private:
-      osp::vec3f upVector;
+      ospray::vec3f upVector;
     };
   }
 }

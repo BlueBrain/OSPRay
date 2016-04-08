@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -51,7 +51,7 @@ namespace ospray {
         lastModified = TimeStamp::now();
       }
       if (lastModified > lastCommitted) {
-        lastCommitted = __rdtsc();
+        lastCommitted = ospray::rdtsc();
         ospCommit(ospTransferFunction);
       }
     }
@@ -68,13 +68,13 @@ namespace ospray {
     void TransferFunction::setDefaultValues()
     {
       colorArray.clear();
-      colorArray.push_back(osp::vec3f(0         , 0           , 0.562493   ));
-      colorArray.push_back(osp::vec3f(0         , 0           , 1          ));
-      colorArray.push_back(osp::vec3f(0         , 1           , 1          ));
-      colorArray.push_back(osp::vec3f(0.500008  , 1           , 0.500008   ));
-      colorArray.push_back(osp::vec3f(1         , 1           , 0          ));
-      colorArray.push_back(osp::vec3f(1         , 0           , 0          ));
-      colorArray.push_back(osp::vec3f(0.500008  , 0           , 0          ));
+      colorArray.push_back(ospray::vec3f(0         , 0           , 0.562493   ));
+      colorArray.push_back(ospray::vec3f(0         , 0           , 1          ));
+      colorArray.push_back(ospray::vec3f(0         , 1           , 1          ));
+      colorArray.push_back(ospray::vec3f(0.500008  , 1           , 0.500008   ));
+      colorArray.push_back(ospray::vec3f(1         , 1           , 0          ));
+      colorArray.push_back(ospray::vec3f(1         , 0           , 0          ));
+      colorArray.push_back(ospray::vec3f(0.500008  , 0           , 0          ));
 
       alphaArray.clear();
       for (int i=0;i<colorArray.size();i++)

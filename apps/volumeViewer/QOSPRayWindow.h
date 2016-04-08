@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <ospray/ospray.h>
+#include "ospray/common/OSPCommon.h"
 #include <QtGui>
 #include <QGLWidget>
-#include <ospray/ospray.h>
 
 struct Viewport
 {
@@ -29,12 +30,12 @@ struct Viewport
                fovY(60.f),
                modified(true)
   {
-    frame = osp::affine3f::translate(from) * osp::affine3f(embree::one);
+    frame = ospray::affine3f::translate(from) * ospray::affine3f(embree::one);
   }
 
-  osp::vec3f from;
-  osp::vec3f at;
-  osp::vec3f up;
+  ospray::vec3f from;
+  ospray::vec3f at;
+  ospray::vec3f up;
 
   /*! aspect ratio (width / height) */
   float aspect;
@@ -48,10 +49,10 @@ struct Viewport
   /*! camera frame in which the Y axis is the depth axis, and X
     and Z axes are parallel to the screen X and Y axis. The frame
     itself remains normalized. */
-  osp::affine3f frame;
+  ospray::affine3f frame;
 
   /*! set up vector */
-  void setUp(const osp::vec3f &vec)
+  void setUp(const ospray::vec3f &vec)
   {
     up = vec;
     snapUp();
@@ -71,9 +72,13 @@ struct Viewport
   }
 };
 
+std::ostream &operator<<(std::ostream &o, const Viewport &viewport);
+
 
 class QOSPRayWindow : public QGLWidget
 {
+Q_OBJECT
+
 public:
 
   QOSPRayWindow(QMainWindow *parent, OSPRenderer renderer, bool showFrameRate, std::string writeFramesFilename);
@@ -82,13 +87,18 @@ public:
   void setRenderingEnabled(bool renderingEnabled);
   void setRotationRate(float rotationRate);
   void setBenchmarkParameters(int benchmarkWarmUpFrames, int benchmarkFrames);
-  virtual void setWorldBounds(const osp::box3f &worldBounds);
+  virtual void setWorldBounds(const ospray::box3f &worldBounds);
 
   Viewport * getViewport() { return &viewport; }
 
   OSPFrameBuffer getFrameBuffer() { return frameBuffer; }
 
   void resetAccumulationBuffer() { ospFrameBufferClear(frameBuffer, OSP_FB_ACCUM); }
+
+signals:
+
+  /*! slots can be connected to this signal to enable rendering of OpenGL components of the scene */
+  void renderGLComponents();
 
 protected:
 
@@ -109,6 +119,9 @@ protected:
 
   /*! strafe the camera from / at point */
   virtual void strafe(float du, float dv);
+
+  /*! render any OpenGL components of the scene */
+  virtual void renderGL();
 
   /*! frame counter */
   long frameCount;
@@ -137,16 +150,17 @@ protected:
   /*! Timer to measure elapsed time over a single frame. */
   QTime renderFrameTimer;
 
-  osp::vec2i windowSize;
+  ospray::vec2i windowSize;
   Viewport viewport;
-  osp::box3f worldBounds;
+  ospray::box3f worldBounds;
   QPoint lastMousePosition;
 
   OSPFrameBuffer frameBuffer;
   OSPRenderer renderer;
   OSPCamera camera;
+  OSPTexture2D maxDepthTexture;
 
   std::string writeFramesFilename;
-  void writeFrameBufferToFile(const uint32 *pixelData);
+  void writeFrameBufferToFile(const uint32_t *pixelData);
 
 };

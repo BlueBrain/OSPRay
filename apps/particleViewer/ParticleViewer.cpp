@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2016 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -14,13 +14,14 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
-/*! \file apps/particleViewer/viewer.cpp 
+/*! \file apps/particleViewer/viewer.cpp
   \brief A GLUT-based viewer for simple particle data */
 
 // viewer widget
 #include "apps/common/widgets/glut3D.h"
 // ospray, for rendering
 #include "ospray/ospray.h"
+#include "common/parallel_for.h"
 // particle viewer
 #include "Model.h"
 #include "uintah.h"
@@ -50,7 +51,7 @@ namespace ospray {
     //! the renderer we're about to use
     std::string rendererType = "ao1";
     //    std::string rendererType = "raycast_eyelight";
-    float radius = 1.f;
+    // float defaultRadius = 1.f;
     InputFormat inputFormat = LAMMPS_XYZ;
     void error(const std::string &err)
     {
@@ -63,7 +64,7 @@ namespace ospray {
     }
 
     using ospray::glut3D::Glut3DWidget;
-    
+
     /*! mini scene graph viewer widget. \internal Note that all handling
       of camera is almost exactly similar to the code in volView;
       might make sense to move that into a common class! */
@@ -85,10 +86,11 @@ namespace ospray {
         ospCommit(renderer);
       };
 
-      virtual void reshape(const ospray::vec2i &newSize)
+      virtual void reshape(const ospray::vec2i &_newSize)
       {
-        Glut3DWidget::reshape(newSize);
+        Glut3DWidget::reshape(_newSize);
         if (fb) ospFreeFrameBuffer(fb);
+        const auto &newSize = reinterpret_cast<const osp::vec2i&>(_newSize);
         fb = ospNewFrameBuffer(newSize,OSP_RGBA_I8,OSP_FB_COLOR|OSP_FB_ACCUM);
         ospSet1f(fb, "gamma", 2.2f);
         ospCommit(fb);
@@ -132,9 +134,9 @@ namespace ospray {
       virtual void display()
       {
         if (!fb || !renderer) return;
-      
+
         static int frameID = 0;
-      
+
         //{
         // note that the order of 'start' and 'end' here is
         // (intentionally) reversed: due to our asynchrounous rendering
@@ -146,38 +148,41 @@ namespace ospray {
         fps.startRender();
         //}
         ++frameID;
-      
+
         if (viewPort.modified) {
           Assert2(camera,"ospray camera is null");
-          ospSetVec3f(camera,"pos",viewPort.from);
-          ospSetVec3f(camera,"dir",viewPort.at-viewPort.from);
-          ospSetVec3f(camera,"up",viewPort.up);
+          auto from = reinterpret_cast<osp::vec3f&>(viewPort.from);
+          auto dir  = viewPort.at-viewPort.from;
+          auto up   = reinterpret_cast<osp::vec3f&>(viewPort.up);
+          ospSetVec3f(camera,"pos",from);
+          ospSetVec3f(camera,"dir",reinterpret_cast<osp::vec3f&>(dir));
+          ospSetVec3f(camera,"up",up);
           ospSetf(camera,"aspect",viewPort.aspect);
           ospCommit(camera);
           ospFrameBufferClear(fb,OSP_FB_ACCUM);
           viewPort.modified = false;
           accumID = 0;
         }
-      
+
         ospRenderFrame(fb,renderer,OSP_FB_COLOR|OSP_FB_ACCUM);
         ++accumID;
-        if (accumID < maxAccum) 
+        if (accumID < maxAccum)
           forceRedraw();
 
         ucharFB = (uint32 *) ospMapFrameBuffer(fb);
         frameBufferMode = Glut3DWidget::FRAMEBUFFER_UCHAR;
         Glut3DWidget::display();
-      
+
         ospUnmapFrameBuffer(ucharFB,fb);
-      
+
         if (showFPS) {
           char title[1000];
-          
+
           sprintf(title,"OSPRay Particle Viewer (%f fps)",fps.getFPS());
           setTitle(title);
         }
       }
-    
+
       OSPModel       model;
       OSPFrameBuffer fb;
       OSPRenderer    renderer;
@@ -197,9 +202,9 @@ namespace ospray {
             a.position.y = y/float(numPerSide);
             a.position.z = z/float(numPerSide);
             a.type = type;
+            a.radius = 1.f/numPerSide;
             m->atom.push_back(a);
           }
-      m->radius = 1.f/numPerSide;
       return m;
     }
 
@@ -219,12 +224,28 @@ namespace ospray {
       return data;
     }
 
+    struct DeferredLoadJob {
+      DeferredLoadJob(particle::Model *model,
+                      const embree::FileName &xyzFileName,
+                      const embree::FileName &defFileName)
+        : model(model), xyzFileName(xyzFileName), defFileName(defFileName)
+      {}
+
+      //! the mode we still have to load
+      particle::Model *model;
+      //! file name of xyz file to be loaded into this model
+      embree::FileName xyzFileName;
+      //! name of atom type defintion file active when this xyz file was added
+      embree::FileName defFileName;
+    };
+
     void ospParticleViewerMain(int &ac, const char **&av)
     {
       std::vector<Model *> particleModel;
-    
+
       cout << "ospParticleViewer: starting to process cmdline arguments" << endl;
-      std::vector<std::pair<particle::Model *, std::string> > deferredLoadingListXYZ;
+      std::vector<DeferredLoadJob *> deferredLoadingListXYZ;
+      embree::FileName defFileName = "";
 
       for (int i=1;i<ac;i++) {
         const std::string arg = av[i];
@@ -232,8 +253,7 @@ namespace ospray {
           assert(i+1 < ac);
           rendererType = av[++i];
         } else if (arg == "--radius") {
-          radius = atof(av[++i]);
-          PRINT(radius);
+          Model::defaultRadius = atof(av[++i]);
         } else if (arg == "--sun-dir") {
           defaultDirLight_direction.x = atof(av[++i]);
           defaultDirLight_direction.y = atof(av[++i]);
@@ -247,6 +267,8 @@ namespace ospray {
           showFPS = true;
         } else if (arg == "--save-to") {
           modelSaveFileName = av[++i];
+        } else if (arg == "--atom-defs") {
+          defFileName = av[++i];
         } else if (av[i][0] == '-') {
           error("unkown commandline argument '"+arg+"'");
         } else {
@@ -258,8 +280,8 @@ namespace ospray {
           } else if (fn.ext() == "xyz") {
             particle::Model *m = new particle::Model;
             //            m->loadXYZ(fn);
-            std::pair<particle::Model *, embree::FileName> loadJob(m,fn.str());
-            deferredLoadingListXYZ.push_back(loadJob);
+            // std::pair<particle::Model *, embree::FileName> loadJob(m,fn.str());
+            deferredLoadingListXYZ.push_back(new DeferredLoadJob(m,fn,defFileName));
             particleModel.push_back(m);
           } else if (fn.ext() == "xyz2") {
             particle::Model *m = new particle::Model;
@@ -272,16 +294,19 @@ namespace ospray {
             error("unknown file format "+fn.str());
         }
       }
+
       if (particleModel.empty())
         error("no input file specified");
 
-#pragma omp parallel 
-      {
-#pragma omp for
-        for (int i=0;i<deferredLoadingListXYZ.size();i++) {
-          deferredLoadingListXYZ[i].first->loadXYZ(deferredLoadingListXYZ[i].second);
-        }
-      }
+      parallel_for(deferredLoadingListXYZ.size(), [&](int i){
+        embree::FileName defFileName = deferredLoadingListXYZ[i]->defFileName;
+        embree::FileName xyzFileName = deferredLoadingListXYZ[i]->xyzFileName;
+        particle::Model *model = deferredLoadingListXYZ[i]->model;
+
+        if (defFileName.str() != "")
+          model->readAtomTypeDefinitions(defFileName);
+        model->loadXYZ(xyzFileName);
+      });
 
 
       // -------------------------------------------------------
@@ -305,16 +330,16 @@ namespace ospray {
       for (int i=0;i<particleModel.size();i++) {
         OSPModel model = ospNewModel();
         OSPData materialData = makeMaterials(ospRenderer,particleModel[i]);
-    
-        OSPData data = ospNewData(particleModel[i]->atom.size()*4,OSP_FLOAT,
+
+        OSPData data = ospNewData(particleModel[i]->atom.size()*5,OSP_FLOAT,
                                   &particleModel[i]->atom[0],OSP_DATA_SHARED_BUFFER);
         ospCommit(data);
 
         OSPGeometry geom = ospNewGeometry("spheres");
-        ospSet1f(geom,"radius",radius*particleModel[i]->radius);
         ospSet1i(geom,"bytes_per_sphere",sizeof(Model::Atom));
-        ospSet1i(geom,"center_offset",0);
-        ospSet1i(geom,"offset_materialID",3*sizeof(float));
+        ospSet1i(geom,"offset_center",0);
+        ospSet1i(geom,"offset_radius",3*sizeof(float));
+        ospSet1i(geom,"offset_materialID",4*sizeof(float));
         ospSetData(geom,"spheres",data);
         ospSetData(geom,"materialList",materialData);
         ospCommit(geom);
