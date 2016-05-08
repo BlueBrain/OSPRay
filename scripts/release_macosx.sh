@@ -22,6 +22,13 @@ export LIBRARY_PATH=
 export DYLD_LIBRARY_PATH=
 TBB_PATH_LOCAL=$PWD/tbb
 
+umask=`umask`
+function onexit {
+  umask $umask
+}
+trap onexit EXIT
+umask 002
+
 mkdir -p build_release
 cd build_release
 # make sure to use default settings
@@ -56,8 +63,8 @@ cmake \
 -D CMAKE_INSTALL_LIBDIR=lib \
 -D CMAKE_INSTALL_DOCDIR=doc \
 -D CMAKE_INSTALL_BINDIR=bin \
+-D TBB_ROOT=$TBB_PATH_LOCAL \
 ..
-#-D TBB_ROOT=$TBB_PATH_LOCAL \
 
 # create ZIP files
 make -j 4 package
