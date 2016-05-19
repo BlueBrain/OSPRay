@@ -166,7 +166,6 @@ INSTALL(FILES ${CMAKE_BINARY_DIR}/OSPConfig.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ospray
   COMPONENT devel
 )
-
 INSTALL(
     DIRECTORY ./ospray DESTINATION include
     FILES_MATCHING PATTERN "*.h" PATTERN "*.ih" PATTERN "*.isph"
@@ -177,7 +176,6 @@ INSTALL(
 INSTALL(
     DIRECTORY ./ospray/embree-v2.7.1/ DESTINATION include/ospray/embree
     FILES_MATCHING PATTERN "*.h" PATTERN "*.ih" PATTERN "*.isph")
-
 
 # has to be last
 INCLUDE(CPack)
