@@ -70,7 +70,10 @@ unmasked void Renderer_default_renderTile(uniform Renderer *uniform self,
 
     const uniform int begin = taskIndex * RENDERTILE_PIXELS_PER_JOB;
     const uniform int end   = begin     + RENDERTILE_PIXELS_PER_JOB;
-    const uniform int startSampleID = max(tile.accumID, 0)*spp;
+    uniform int r;
+    rdrand(&r);
+    const uniform int startSampleID = (r + max(tile.accumID, 0))*spp;
+    //const uniform int startSampleID = max(tile.accumID, 0)*spp;
 
     for (uniform uint32 i = begin; i < end; i += programCount) {
       const uint32 index = i + programIndex;
