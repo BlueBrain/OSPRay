@@ -253,6 +253,9 @@ namespace ospray {
       ManagedObject *object = (ManagedObject *)_object;
       Assert(object != nullptr  && "invalid object handle");
       Assert(name != nullptr && "invalid identifier for object parameter");
+      ManagedObject *existing = object->getParam<ManagedObject*>(name, nullptr);
+      if (existing)
+          existing->refDec();
       object->removeParam(name);
     }
 
